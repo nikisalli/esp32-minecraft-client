@@ -8,6 +8,8 @@ int server_port = 25565;
 const char* ssid = "ssid";
 const char* password =  "password";
 
+minecraft mc (username, server_url, server_port);
+
 void setup() {
   Serial.begin(115200);
   delay(100);
@@ -34,11 +36,11 @@ void loop(){
         return;
     }
 
-    mc.handShake(&client, 2);
-    //mc.ping(&client, 1);
-    mc.loginStart(&client);
+    mc.handShake(client, 2);
+    mc.ping(client, 1);
+    //mc.loginStart(client);
     delay(100);
-    mc.writeChat(&client, "test");
+    //mc.writeChat(client, "test");
 
     /*while(1){                        //keep alive work in progress (needs compression)
         if(client.available() > 0)
