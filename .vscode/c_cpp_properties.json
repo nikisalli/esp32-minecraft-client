@@ -1,0 +1,28 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "/home/nik/Desktop/arduino-1.8.9/portable/packages/esp32/hardware/esp32/1.0.2",
+                "/home/nik/Desktop/arduino-1.8.9/portable/packages/esp32/tools",
+                "/home/nik/Desktop/arduino-1.8.9/portable/packages/esp32",
+                "/home/nik/Desktop/arduino-1.8.9/portable/packages/esp32/hardware/esp32/1.0.2/**",
+                "/home/nik/Desktop/arduino-1.8.9/portable/packages/esp32/tools/**",
+                "/home/nik/Desktop/arduino-1.8.9/portable/packages/esp32/hardware/esp32/1.0.2/cores/esp32",
+                "/home/nik/Desktop/arduino-1.8.9/portable/packages/esp32/hardware/esp32/1.0.2/tools/sdk/include/freertos",
+                "/home/nik/Desktop/arduino-1.8.9/portable/sketchbook/libraries/GY953-master",
+                "/home/nik/Desktop/arduino-1.8.9/portable/sketchbook/libraries/GY953-master/src",
+                "/home/nik/Desktop/arduino-1.8.9/hardware/arduino/avr/**",
+                "/home/nik/Desktop/arduino-1.8.9/tools/**",
+                "/home/nik/Desktop/NightmareV2/software/Nightmare_code_V3/**",
+                "/home/nik/Desktop/arduino-1.8.9/portable/sketchbook/libraries/ArduinoJson/**",
+                "/home/nik/Desktop/arduino-1.8.9/portable/sketchbook/libraries/ArduinoJson"
+            ],
+            "forcedInclude": [],
+            "compilerPath": "/usr/bin/clang",
+            "cStandard": "c11",
+            "cppStandard": "c++17"
+        }
+    ],
+    "version": 4
+}
