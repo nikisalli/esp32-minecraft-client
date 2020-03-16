@@ -1,5 +1,54 @@
-#include "serializers.h"
+#include "minecraft.h"
 #include <Arduino.h>
+
+// public //
+
+minecraft::minecraft(String _username, String _url, int _port){
+    username = _username;
+    server_url = _url;
+    server_port = _port;
+}
+
+void minecraft::keepAlive(Stream* S, uint64_t id){
+    writeVarInt(S, 9);
+    writeVarInt(S, 0x0F);
+    writeLong(S, id);
+}
+
+void minecraft::request(Stream* S){
+    writeVarInt(S, 1);
+    writeVarInt(S, 0);
+}
+
+void minecraft::ping(Stream* S, uint64_t num){
+    writeVarInt(S, 9);  //packet lenght
+    writeVarInt(S, 1);  //packet id
+    writeLong(S, num);
+}
+
+void minecraft::loginStart(Stream* S){
+    writeVarInt(S, 2 + username.length());
+    writeVarInt(S, 0);
+    writeString(S, username);
+}
+
+void minecraft::writeChat(Stream* S, String text){
+    writeVarInt(S, 2 + text.length());
+    writeVarInt(S, 3);
+    writeString(S, text);
+}
+
+void minecraft::handShake(Stream* S, byte state){
+    writeVarInt(S, 23);
+    writeVarInt(S, 0);
+    writeVarInt(S, 578);
+    writeString(S, server_url);
+    writeUnsignedShort(S, server_port);
+    writeVarInt(S, state);
+}
+
+
+// private //
 
 void writeVarInt(Stream* S, int value) {
     do {
