@@ -1,5 +1,5 @@
 #include <WiFi.h>
-#include "/home/nik/Desktop/roba esp32/esp32-minecraft-client/src/minecraft.h"
+#include <minecraft.h>
 
 String username = "username";
 String server_url = "server_url";
