@@ -3,13 +3,13 @@
 
 // public //
 
-minecraft::minecraft(String _username, String _url, uint16_t _port){
+minecraft::minecraft(String _username, String _url, const uint16_t _port){
     username = _username;
     server_url = _url;
     server_port = _port;
 }
 
-void minecraft::keepAlive(Stream& S, uint64_t id){
+void minecraft::keepAlive(Stream& S, const uint64_t id){
     writeVarInt(S, 9);
     writeVarInt(S, 0x0F);
     writeLong(S, id);
@@ -20,7 +20,7 @@ void minecraft::request(Stream& S){
     writeVarInt(S, 0);
 }
 
-void minecraft::ping(Stream& S, uint64_t num){
+void minecraft::ping(Stream& S, const uint64_t num){
     writeVarInt(S, 9);  //packet lenght
     writeVarInt(S, 1);  //packet id
     writeLong(S, num);
@@ -32,13 +32,13 @@ void minecraft::loginStart(Stream& S){
     writeString(S, username);
 }
 
-void minecraft::writeChat(Stream& S, String text){
+void minecraft::writeChat(Stream& S, const String text){
     writeVarInt(S, 2 + text.length());
     writeVarInt(S, 3);
     writeString(S, text);
 }
 
-void minecraft::handShake(Stream& S, byte state){
+void minecraft::handShake(Stream& S, const uint8_t state){
     writeVarInt(S, 23);
     writeVarInt(S, 0);
     writeVarInt(S, 578);
