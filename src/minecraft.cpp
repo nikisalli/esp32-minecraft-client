@@ -3,13 +3,13 @@
 
 // public //
 
-minecraft::minecraft(String _username, String _url, const uint16_t _port){
+minecraft::minecraft(String _username, String _url, uint16_t _port){
     username = _username;
     server_url = _url;
     server_port = _port;
 }
 
-void minecraft::keepAlive(Stream& S, const uint64_t id){
+void minecraft::keepAlive(Stream& S, uint64_t id){
     writeVarInt(S, 9);
     writeVarInt(S, 0x0F);
     writeLong(S, id);
@@ -20,7 +20,7 @@ void minecraft::request(Stream& S){
     writeVarInt(S, 0);
 }
 
-void minecraft::ping(Stream& S, const uint64_t num){
+void minecraft::ping(Stream& S, uint64_t num){
     writeVarInt(S, 9);  //packet lenght
     writeVarInt(S, 1);  //packet id
     writeLong(S, num);
@@ -32,13 +32,13 @@ void minecraft::loginStart(Stream& S){
     writeString(S, username);
 }
 
-void minecraft::writeChat(Stream& S, const String text){
+void minecraft::writeChat(Stream& S, String text){
     writeVarInt(S, 2 + text.length());
     writeVarInt(S, 3);
     writeString(S, text);
 }
 
-void minecraft::handShake(Stream& S, const uint8_t state){
+void minecraft::handShake(Stream& S, uint8_t state){
     writeVarInt(S, 23);
     writeVarInt(S, 0);
     writeVarInt(S, 578);
@@ -50,7 +50,7 @@ void minecraft::handShake(Stream& S, const uint8_t state){
 
 // private //
 
-void writeVarInt(Stream& S, int16_t value) {
+void minecraft::writeVarInt(Stream& S, int16_t value) {
     do {
         byte temp = (byte)(value & 0b01111111);
         value = lsr(value,7);
@@ -61,7 +61,7 @@ void writeVarInt(Stream& S, int16_t value) {
     } while (value != 0);
 }
 
-void writeVarLong(Stream& S, int64_t value) {
+void minecraft::writeVarLong(Stream& S, int64_t value) {
     do {
         byte temp = (byte)(value & 0b01111111);
         value = lsr(value,7);
@@ -72,7 +72,7 @@ void writeVarLong(Stream& S, int64_t value) {
     } while (value != 0);
 }
 
-void writeString(Stream& S, String str){
+void minecraft::writeString(Stream& S, String str){
     int length = str.length();
     byte buf[length + 1]; 
     str.getBytes(buf, length + 1);
@@ -82,13 +82,13 @@ void writeString(Stream& S, String str){
     }
 }
 
-void writeLong(Stream& S, uint64_t num){
+void minecraft::writeLong(Stream& S, uint64_t num){
     for(int i=7; i>=0; i--){
         S.write((byte)((num >> (i&8)) & 0xff));
     }
 }
 
-void writeUnsignedShort(Stream& S, uint16_t num){
+void minecraft::writeUnsignedShort(Stream& S, uint16_t num){
     S.write((byte)((num >> 8) & 0xff));
     S.write((byte)(num & 0xff));
 }
