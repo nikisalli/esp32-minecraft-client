@@ -3,7 +3,7 @@
 
 // public //
 
-minecraft::minecraft(String _username, String _url, int _port){
+minecraft::minecraft(String _username, String _url, uint16_t _port){
     username = _username;
     server_url = _url;
     server_port = _port;
@@ -50,7 +50,7 @@ void minecraft::handShake(Stream& S, byte state){
 
 // private //
 
-void writeVarInt(Stream& S, int value) {
+void writeVarInt(Stream& S, int16_t value) {
     do {
         byte temp = (byte)(value & 0b01111111);
         value = lsr(value,7);
@@ -61,7 +61,7 @@ void writeVarInt(Stream& S, int value) {
     } while (value != 0);
 }
 
-void writeVarLong(Stream& S, long value) {
+void writeVarLong(Stream& S, int64_t value) {
     do {
         byte temp = (byte)(value & 0b01111111);
         value = lsr(value,7);
