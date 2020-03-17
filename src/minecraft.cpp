@@ -39,7 +39,7 @@ void minecraft::writeChat(Stream& S, String text){
 }
 
 void minecraft::handShake(Stream& S, uint8_t state){
-    writeVarInt(S, 23);
+    writeVarInt(S, 6 + server_url.length());
     writeVarInt(S, 0);
     writeVarInt(S, 578);
     writeString(S, server_url);
