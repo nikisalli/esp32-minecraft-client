@@ -1,8 +1,9 @@
 #include <WiFi.h>
 #include <minecraft.h>
+//#include "/home/nik/Desktop/roba esp32/esp32-minecraft-client/src/minecraft.h"
 
 String username = "username";
-String server_url = "server_url";
+String server_url = "url";
 int server_port = 25565;
 
 const char* ssid = "ssid";
@@ -37,11 +38,20 @@ void loop(){
     }
 
     mc.handShake(client, 2);
-    mc.ping(client, 1);
-    //mc.loginStart(client);
+    //mc.ping(client, 1);
+    mc.loginStart(client);
     delay(100);
     //mc.writeChat(client, "test");
 
+    while(1){
+        if(client.available() > 0){
+            while(client.available() > 0){
+                Serial.print(client.read(), HEX);
+                Serial.print(" ");
+            }
+            Serial.println();
+        }
+    }
     /*while(1){                        //keep alive work in progress (needs compression)
         if(client.available() > 0)
         while(client.available() > 0){
