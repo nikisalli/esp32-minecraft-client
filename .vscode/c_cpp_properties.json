@@ -14,7 +14,6 @@
                 "/home/nik/Desktop/arduino-1.8.9/portable/sketchbook/libraries/GY953-master/src",
                 "/home/nik/Desktop/arduino-1.8.9/hardware/arduino/avr/**",
                 "/home/nik/Desktop/arduino-1.8.9/tools/**",
-                "/home/nik/Desktop/NightmareV2/software/Nightmare_code_V3/**",
                 "/home/nik/Desktop/arduino-1.8.9/portable/sketchbook/libraries/ArduinoJson/**",
                 "/home/nik/Desktop/arduino-1.8.9/portable/sketchbook/libraries/ArduinoJson",
                 "${workspaceFolder}/src"

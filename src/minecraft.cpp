@@ -95,7 +95,7 @@ String minecraft::readString(Stream& S){
     Serial.println("[INFO] <- text length to read: " + String(length) + " bytes");
     String result;
     for(int i=0; i<length; i++){
-        while (S.available() > 0){}
+        while (S.available() < 1);
         result.concat((char)S.read());
     }
     return result;
@@ -106,7 +106,7 @@ int minecraft::readVarInt(Stream& S) {
     int result = 0;
     byte read;
     do {
-        while (S.available() > 0){}
+        while (S.available() < 1);
         read = S.read();
         int value = (read & 0b01111111);
         result |= (value << (7 * numRead));
@@ -120,6 +120,9 @@ int minecraft::readVarInt(Stream& S) {
 
 // private //
 int minecraft::VarIntLength(int val) {
+    if(val == 0){
+        return 1;
+    }
     return (int)floor(log(val) / log(128)) + 1;
 }
 
