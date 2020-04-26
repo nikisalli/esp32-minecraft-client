@@ -13,8 +13,6 @@ TaskHandle_t listener;
 minecraft mc (username, server_url, server_port);
 WiFiClient client;
 
-float v = 0;
-
 void setup() {
     Serial.begin(115200);
     delay(100);
