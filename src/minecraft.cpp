@@ -9,6 +9,38 @@ minecraft::minecraft(String _username, String _url, uint16_t _port){
     server_port = _port;
 }
 
+void minecraft::teleportConfirm(Stream& S, int id){
+    while(writing);
+    writing = true;
+    if(compression_enabled){
+        writeVarInt(S, 2 + VarIntLength(id));
+        writeVarInt(S, 0); // empty data length
+        writeVarInt(S, 0x00);
+    } else {
+        writeVarInt(S, 1 + VarIntLength(id));
+        writeVarInt(S, 0x00);
+    }
+    writeVarInt(S, id);
+    writing = false;
+}
+
+void minecraft::setRotation(Stream& S, float yaw, float pitch, bool ground){
+    while(writing);
+    writing = true;
+    if(compression_enabled){
+        writeVarInt(S, 11);
+        writeVarInt(S, 0); // empty data length
+        writeVarInt(S, 0x13);
+    } else {
+        writeVarInt(S, 10);
+        writeVarInt(S, 0x13);
+    }
+    writeFloat(S, yaw);
+    writeFloat(S, pitch);
+    S.write(ground?1:0);
+    writing = false;
+}
+
 void minecraft::keepAlive(Stream& S, uint64_t id){
     while(writing);
     writing = true;
@@ -95,6 +127,36 @@ void minecraft::clientStatus(Stream& S, uint8_t state){
     writeVarInt(S, 0);
 }
 
+float minecraft::readFloat(Stream& S){
+    char b[4] = {};
+    while(S.available() < 4);
+    for(int i=3; i>=0; i--){
+        b[i] = S.read();
+        Serial.print(" ");
+        Serial.print(b[i], HEX);
+    }
+    Serial.print("  ");
+    float f = 0;
+    memcpy(&f, b, sizeof(float));
+    Serial.println(f);
+    return f;
+}
+
+double minecraft::readDouble(Stream& S){
+    char b[8] = {};
+    while(S.available() < 8);
+    for(int i=7; i>=0; i--){
+        b[i] = S.read();
+        Serial.print(" ");
+        Serial.print(b[i], HEX);
+    }
+    Serial.print("  ");
+    double d = 0;
+    memcpy(&d, b, sizeof(double));
+    Serial.println(d);
+    return d;
+}
+
 long minecraft::readLong(Stream& S){
     char b[8] = {};
     while(S.available() < 8);
@@ -146,6 +208,20 @@ int minecraft::VarIntLength(int val) {
         return 1;
     }
     return (int)floor(log(val) / log(128)) + 1;
+}
+
+void minecraft::writeDouble(Stream& S, double value){
+    unsigned char * p = reinterpret_cast<unsigned char *>(&value);
+    for(int i=7; i>=0; i--){
+        S.write(p[i]);
+    }
+}
+
+void minecraft::writeFloat(Stream& S, float value) {
+    unsigned char * p = reinterpret_cast<unsigned char *>(&value);
+    for(int i=3; i>=0; i--){
+        S.write(p[i]);
+    }
 }
 
 void minecraft::writeVarInt(Stream& S, int16_t value) {

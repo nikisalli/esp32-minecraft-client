@@ -1,7 +1,6 @@
 #include <WiFi.h>
 #include <minecraft.h>
-#include "/home/nik/Desktop/roba esp32/esp32-minecraft-client/src/miniz.h"
-//#include "/home/nik/Desktop/roba esp32/esp32-minecraft-client/src/minecraft.h"
+//#include "../src/miniz.h"
 
 String username = "nickname";
 String server_url = "ip";
@@ -13,6 +12,8 @@ const char* password =  "pass";
 TaskHandle_t listener;
 minecraft mc (username, server_url, server_port);
 WiFiClient client;
+
+float v = 0;
 
 void setup() {
     Serial.begin(115200);
@@ -55,16 +56,23 @@ void setup() {
     Serial.println("[INFO] -> logging in as nikbot");
     delay(200);*/
 
-    mc.writeChat(client, "buongiorno pezzi di merda da esp32");
+    mc.writeChat(client, "test");
     Serial.println("[INFO] -> writing to chat");
     vTaskDelay(pdMS_TO_TICKS(1000));
+
     disableCore0WDT();
     disableCore1WDT();
 }
 
 void loop(){
-    vTaskDelay(pdMS_TO_TICKS(1000));
-    mc.writeChat(client, "[nik INFO] Heap: " + String(ESP.getFreeHeap()/1024.0) + "kB || buf: " + String(client.available()/1024.0) + "kB");
+    vTaskDelay(pdMS_TO_TICKS(50));
+    if(mc.teleported){
+        mc.setRotation(client, mc.yaw, mc.pitch, mc.onGround);
+        Serial.println("[INFO] -> rotation set to: " + String(mc.yaw));
+        mc.yaw+=5;
+    }
+    
+    //mc.writeChat(client, "[nik INFO] Heap: " + String(ESP.getFreeHeap()/1024.0) + "kB || buf: " + String(client.available()/1024.0) + "kB");
     Serial.println("[INFO] # buf: " + String(client.available()/1024.0) + "kB");
 }
 
@@ -102,6 +110,47 @@ void listener_fun( void * parameter ){
                 Serial.println(id, HEX);*/
 
                 switch (id){
+                    case 0x49:{
+                        mc.health = mc.readFloat(client);
+                        mc.food = mc.readVarInt(client);
+                        mc.food_sat = mc.readFloat(client);
+
+                        Serial.println("[INFO] <- player stats health: " + String(mc.health)
+                                        + " food: " + String(mc.food)
+                                        + " food_sat: " + String(mc.food_sat));
+                        
+                        break;
+                    }
+                    case 0x36:{
+                        mc.x = mc.readDouble(client);
+                        mc.y = mc.readDouble(client);
+                        mc.z = mc.readDouble(client);
+                        mc.yaw = mc.readFloat(client);
+                        mc.pitch = mc.readFloat(client);
+                        uint8_t flags = client.read();
+                        int id = mc.readVarInt(client);
+                        mc.teleported = true;
+
+                        Serial.println("[INFO] <- player pos and look X: " + String(mc.x)
+                                        + " Y: " + String(mc.y)
+                                        + " Z: " + String(mc.z)
+                                        + " yaw: " + String(mc.yaw)
+                                        + " pitch: " + String(mc.pitch)
+                                        + " flags: " + String(flags)
+                                        + " id: " + String(id));
+
+                        mc.teleportConfirm(client, id);
+                        break;
+                    }
+                    case 0x09:{
+                        int ent_id = mc.readVarInt(client);
+                        long pos = mc.readLong(client);
+                        uint8_t stage = client.read();
+                        Serial.println("[INFO] <- block destroy id: " + String(ent_id)
+                                        + " pos: " + String(pos)
+                                        + " stage: " + String(stage));
+                        break;
+                    }
                     case 0x21:{
                         long num = mc.readLong(client);
                         mc.keepAlive(client, num);
