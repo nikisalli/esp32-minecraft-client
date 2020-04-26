@@ -10,6 +10,8 @@ minecraft::minecraft(String _username, String _url, uint16_t _port){
 }
 
 void minecraft::keepAlive(Stream& S, uint64_t id){
+    while(writing);
+    writing = true;
     if(compression_enabled){
         writeVarInt(S, 10);
         writeVarInt(S, 0); // empty data length
@@ -19,6 +21,7 @@ void minecraft::keepAlive(Stream& S, uint64_t id){
         writeVarInt(S, 0x0F);
     }
     writeLong(S, id);
+    writing = false;
 }
 
 void minecraft::request(Stream& S){
@@ -51,6 +54,8 @@ void minecraft::loginStart(Stream& S){
 }
 
 void minecraft::writeChat(Stream& S, String text){
+    while(writing);
+    writing = true;
     if(compression_enabled){
         writeVarInt(S, 3 + text.length());
         writeVarInt(S, 0);  // empty data length
@@ -60,6 +65,7 @@ void minecraft::writeChat(Stream& S, String text){
         writeVarInt(S, 3); 
     }
     writeString(S, text);
+    writing = false;
 }
 
 void minecraft::handShake(Stream& S, uint8_t state){
@@ -89,6 +95,22 @@ void minecraft::clientStatus(Stream& S, uint8_t state){
     writeVarInt(S, 0);
 }
 
+long minecraft::readLong(Stream& S){
+    char b[8] = {};
+    while(S.available() < 8);
+    for(int i=0; i<8; i++){
+        b[i] = S.read();
+    }
+    long l = ((long) b[0] << 56)
+       | ((long) b[1] & 0xff) << 48
+       | ((long) b[2] & 0xff) << 40
+       | ((long) b[3] & 0xff) << 32
+       | ((long) b[4] & 0xff) << 24
+       | ((long) b[5] & 0xff) << 16
+       | ((long) b[6] & 0xff) << 8
+       | ((long) b[7] & 0xff);
+    return l;
+}
 
 String minecraft::readString(Stream& S){
     int length = readVarInt(S);

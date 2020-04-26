@@ -14,7 +14,8 @@ class minecraft{
 
         bool compression_enabled = 0;
         int compression_treshold = 0;
-
+        bool writing = 0;
+        
         void keepAlive          (Stream& S, uint64_t id);
         void request            (Stream& S);
         void ping               (Stream& S, uint64_t num);
@@ -24,6 +25,7 @@ class minecraft{
         void clientStatus       (Stream& S, uint8_t state);
         int readVarInt          (Stream& S);
         String readString       (Stream& S);
+        long readLong           (Stream& S);
         int VarIntLength        (int val);
     private:
         void writeVarInt        (Stream& S, int16_t value);

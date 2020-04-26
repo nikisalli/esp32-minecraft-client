@@ -36,7 +36,7 @@ void setup() {
         return;
     }
     delay(500);
-    xTaskCreatePinnedToCore(listener_fun, "listener", 100000, NULL, 1, &listener, 0);
+    xTaskCreatePinnedToCore(listener_fun, "listener", 100000, NULL, 2, &listener, 0);
  
     mc.handShake(client, 2);
     Serial.println("[INFO] -> handShake packet sent");
@@ -55,7 +55,7 @@ void setup() {
     Serial.println("[INFO] -> logging in as nikbot");
     delay(200);*/
 
-    mc.writeChat(client, "test");
+    mc.writeChat(client, "buongiorno pezzi di merda da esp32");
     Serial.println("[INFO] -> writing to chat");
     vTaskDelay(pdMS_TO_TICKS(1000));
     disableCore0WDT();
@@ -64,6 +64,8 @@ void setup() {
 
 void loop(){
     vTaskDelay(pdMS_TO_TICKS(1000));
+    mc.writeChat(client, "[nik INFO] Heap: " + String(ESP.getFreeHeap()/1024.0) + "kB || buf: " + String(client.available()/1024.0) + "kB");
+    Serial.println("[INFO] # buf: " + String(client.available()/1024.0) + "kB");
 }
 
 void printHex(int num, int precision) {
@@ -80,53 +82,48 @@ void listener_fun( void * parameter ){
     while(1){
         int pack_length = mc.readVarInt(client);
 
-        if(mc.compression_enabled && pack_length > mc.compression_treshold){
+        if(mc.compression_enabled){
             int data_length = mc.readVarInt(client);
 
-            for(int i=0; i<pack_length - mc.VarIntLength(data_length); i++){
-                while (client.available() < 1);
-                client.read();
-            }
+            if(data_length > mc.compression_treshold){
+                int len = pack_length - mc.VarIntLength(data_length);
+                uint8_t* buf;
+                buf = new uint8_t[len];
 
-            Serial.println("[INFO] <- packet received! pack_lenght: " + String(pack_length) + " data_length: " + String(data_length));
-        } 
-            
-        else if (mc.compression_enabled && pack_length < mc.compression_treshold) {
-            int data_length = mc.readVarInt(client); // unused because always zero
-            int id = mc.readVarInt(client);
+                client.readBytes(buf, len);
 
-            Serial.print("[INFO] <- Received packet length: " + String(pack_length) + " bytes packet id: 0x");
-            Serial.print(id, HEX);
-            Serial.print(" data length: " + String(data_length));
+                delete [] buf;
 
-            switch (id){
-                /*case 0x00:{
-                    String str = mc.readString(client);
-                    Serial.println("[INFO] <- text Received: " + str);
-                    break;
-                }*/
-                case 0x1C:{
-                    for(int i=0; i < pack_length - mc.VarIntLength(id) - mc.VarIntLength(data_length); i++ ){
-                        while (client.available() < 1);
-                        client.read();
-                        //Serial.print(" ");
-                        //Serial.print(client.read(), HEX);
+                //Serial.println("[INFO] <- packet received! pack_length: " + String(pack_length) + " data_length: " + String(data_length));
+            } else {
+                int id = mc.readVarInt(client);
+
+                /*Serial.print("[INFO] <- Received packet length: " + String(pack_length) + " bytes packet id: 0x");
+                Serial.print(id, HEX);
+                Serial.println(" data length: " + String(data_length));*/
+
+                switch (id){
+                    case 0x21:{
+                        long num = mc.readLong(client);
+                        mc.keepAlive(client, num);
+                        Serial.println("[INFO] <- received keepalive " + String(num));
+                        break;
                     }
-                    Serial.println();
-                    break;
-                }
-                default:{
-                    for(int i=0; i < pack_length - mc.VarIntLength(id) - mc.VarIntLength(data_length); i++ ){
-                        while (client.available() < 1);
-                        client.read();
+                    case 0x0F:{
+                        String chat = mc.readString(client);
+                        uint8_t pos = client.read();
+                        Serial.println("[INFO] <- received message: " + chat + " sender type: " + String(pos));
                     }
-                    Serial.println();
-                    break;
+                    default:{
+                        for(int i=0; i < pack_length - mc.VarIntLength(id) - mc.VarIntLength(data_length); i++ ){
+                            while (client.available() < 1);
+                            client.read();
+                        }
+                        break;
+                    }
                 }
-            }
-        } 
-            
-        else if (!mc.compression_enabled) {
+            } 
+        } else {
             int id = mc.readVarInt(client);
 
             Serial.print("[INFO] <- Received packet length: " + String(pack_length) + " bytes packet id: 0x");
@@ -155,6 +152,5 @@ void listener_fun( void * parameter ){
                 }
             }
         }
-        Serial.println("[INFO] # bytes in buf: " + String(client.available()) + " bytes");
     }
 }
