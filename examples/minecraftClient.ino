@@ -3,12 +3,12 @@
 #include "/home/nik/Desktop/roba esp32/esp32-minecraft-client/src/miniz.h"
 //#include "/home/nik/Desktop/roba esp32/esp32-minecraft-client/src/minecraft.h"
 
-String username = "nikbot";
-String server_url = "192.168.1.12";
+String username = "nickname";
+String server_url = "ip";
 int server_port = 25565;
 
-const char* ssid = "Vodafone-A48216342";
-const char* password =  "12344321";
+const char* ssid = "ssid";
+const char* password =  "pass";
 
 TaskHandle_t listener;
 minecraft mc (username, server_url, server_port);
@@ -98,9 +98,8 @@ void listener_fun( void * parameter ){
             } else {
                 int id = mc.readVarInt(client);
 
-                /*Serial.print("[INFO] <- Received packet length: " + String(pack_length) + " bytes packet id: 0x");
-                Serial.print(id, HEX);
-                Serial.println(" data length: " + String(data_length));*/
+                /*Serial.print("[INFO] <- pack len: " + String(pack_length) + "B id: 0x");
+                Serial.println(id, HEX);*/
 
                 switch (id){
                     case 0x21:{
