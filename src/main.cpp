@@ -13,6 +13,10 @@ void update( void * pvParameters ){
 }
 
 void setup() {
+    disableCore0WDT();
+    disableCore1WDT();
+    disableLoopWDT();
+
     Serial.begin(115200);
     delay(100);
     WiFi.begin(ssid, password); 
@@ -33,43 +37,42 @@ void setup() {
         delay(1000);
         return;
     }
-    delay(500);
+
+    client.setNoDelay(true);
+    client.setTimeout(2);
+
     xTaskCreatePinnedToCore(update, "listener", 100000, NULL, 2, &listener, 0);
 
+    delay(1000);
     mc.handShake(2);
     Serial.println("[INFO] -> handShake packet sent");
-    vTaskDelay(pdMS_TO_TICKS(1000));
+    delay(1000);
     //mc.ping(client, 1);
 
     mc.loginStart();
     Serial.println("[INFO] -> login_start packet sent");
-    vTaskDelay(pdMS_TO_TICKS(2000));
+    delay(1000);
 
-    /*mc.clientStatus(client, 0);
-    Serial.println("[INFO] -> client_status packet sent");
-    delay(2000);*/
+    //mc.clientStatus(0);
+    //Serial.println("[INFO] -> client_status packet sent");
+    //delay(100);
 
-    /*mc.writeChat(client, "/login nikk");
+    /*mc.writeChat("/login nikk");
     Serial.println("[INFO] -> logging in as nikbot");
     delay(200);*/
 
-    // mc.writeChat("test");
-    // Serial.println("[INFO] -> writing to chat");
+    mc.writeChat("test");
+    Serial.println("[INFO] -> writing to chat");
     // vTaskDelay(pdMS_TO_TICKS(1000));
-    disableCore0WDT();
-    disableCore1WDT();
 }
 
 void loop(){
-    Serial.println("[INFO] # buf: " + String(client.available()/1024.0) + "kB");
-    vTaskDelay(pdMS_TO_TICKS(2000));
+    mc.yaw+=5;
+    if(mc.yaw > 360){
+        mc.yaw = 0;
+    }
+    mc.setRotation(mc.yaw, mc.pitch, mc.onGround);
+    delay(50);
+    Serial.println("[INFO] # buf: " + String(client.available()/1024.0) + "kB Heap: " + String(ESP.getFreeHeap()/1024.0) + "kB");
     //mc.writeChat(client, "[nik INFO] Heap: " + String(ESP.getFreeHeap()/1024.0) + "kB || buf: " + String(client.available()/1024.0) + "kB");
-}
-
-void printHex(int num, int precision) {
-    char tmp[16];
-    char format[128];
-    sprintf(format, "%%.%dX", precision);
-    sprintf(tmp, format, num);
-    Serial.print(tmp);
 }

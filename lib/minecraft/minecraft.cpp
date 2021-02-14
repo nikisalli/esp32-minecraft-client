@@ -26,7 +26,10 @@ void minecraft::teleportConfirm(int id){
 }
 
 void minecraft::setRotation(float yaw, float pitch, bool ground){
-    while(writing);
+    long tim = millis();
+    while(writing && !(millis() - tim < timeout)){
+        delay(1);
+    }
     writing = true;
     if(compression_enabled){
         writeVarInt(11);
@@ -284,6 +287,19 @@ void minecraft::handle(){
                 // Serial.println(id, HEX);
 
                 switch (id){
+                    case 0x05:{
+                        int id = readVarInt();
+                        long UUIDmsb = readLong();
+                        long UUIDlsb = readLong();
+                        double px = readDouble();
+                        double py = readDouble();
+                        double pz = readDouble();
+                        uint8_t yaw = S->read();
+                        uint8_t pitch = S->read();
+                        
+                        Serial.println("[INFO] <- player found at X: " + String(px) + " Y: " + String(py) + " Z: " + String(pz));
+                        break;
+                    }
                     case 0x49:{
                         health = readFloat();
                         food = readVarInt();
