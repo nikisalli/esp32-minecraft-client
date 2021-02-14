@@ -9,4 +9,4 @@ the default sketch attempts to connect and then just keeps spinning its head.
 rename include/credentials_edit_me.h to credentials.h and edit it with your data, compile and upload.
 It should write some debug info on the serial port and access the server.
 
-![alt text](https://github.com/nikisalli/esp32-minecraft-client/blob/features/example1.jpg?raw=true)
+![alt text](https://github.com/nikisalli/esp32-minecraft-client/blob/features/images/example1.jpg?raw=true)
