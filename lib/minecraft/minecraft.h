@@ -27,6 +27,8 @@ class minecraft{
         int food = 0;
         float food_sat = 0;
         
+        int timeout = 100;
+
         void handle             ();  // this stream is the logging port not the web socket!!
         void teleportConfirm    (int id);
         void setRotation        (float yaw, float pitch, bool ground);
