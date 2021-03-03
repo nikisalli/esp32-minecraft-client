@@ -1,134 +1,196 @@
 #include "minecraft.h"
 #include <Arduino.h>
 
-// public //
+// PACKET
+void packet::write(uint8_t val){
+    buffer[index] = val;
+    index ++;
+}
 
+void packet::write(uint8_t * buf, size_t size){
+    memcpy(buffer + index, std::move(buf), size);
+    index += size;
+}
+
+void packet::serverWriteVarInt(int32_t value){
+    do {
+        uint8_t temp = (uint8_t)(value & 0b01111111);
+        value = lsr(value,7);
+        if (value != 0) {
+            temp |= 0b10000000;
+        }
+        S->write(temp);
+    } while (value != 0);
+}
+
+void packet::writePacket(){
+    (*mtx).lock();
+    if(compression_enabled){ // TODO
+        serverWriteVarInt(index + 1);
+        serverWriteVarInt(0);
+    } else {
+        serverWriteVarInt(index);
+    }
+    S->write(buffer, index);
+    (*mtx).unlock();
+}
+
+// MINECRAFT
 minecraft::minecraft(String _username, String _url, uint16_t _port, Stream* __S){
     username = _username;
     server_url = _url;
     server_port = _port;
     S = __S;
+    mtx = new std::mutex();
 }
 
-void minecraft::teleportConfirm(int id){
-    while(writing);
-    writing = true;
-    if(compression_enabled){
-        writeVarInt(2 + VarIntLength(id));
-        writeVarInt(0); // empty data length
-        writeVarInt(0x00);
-    } else {
-        writeVarInt(1 + VarIntLength(id));
-        writeVarInt(0x00);
-    }
-    writeVarInt(id);
-    writing = false;
+// CLIENTBOUND
+void minecraft::readSpawnPlayer(){
+    int id = readVarInt();
+    uint64_t player_UUID = readUUID();
+    double px = readDouble();
+    double py = readDouble();
+    double pz = readDouble();
+    uint8_t yaw = readByte();
+    uint8_t pitch = readByte();
+    
+    login("player id:" + String(id) + " found at X: " + String(px) + " Y: " + String(py) + " Z: " + String(pz));
 }
 
-void minecraft::setRotation(float yaw, float pitch, bool ground){
-    long tim = millis();
-    while(writing && !(millis() - tim < timeout)){
-        delay(1);
-    }
-    writing = true;
-    if(compression_enabled){
-        writeVarInt(11);
-        writeVarInt(0); // empty data length
-        writeVarInt(0x13);
-    } else {
-        writeVarInt(10);
-        writeVarInt(0x13);
-    }
-    writeFloat(yaw);
-    writeFloat(pitch);
-    S->write(ground?1:0);
-    writing = false;
+void minecraft::readFoodAndSat(){
+    health = readFloat();
+    food = readVarInt();
+    food_sat = readFloat();
+    login("player stats health: " + String(health) + " food: " + String(food) + " food_sat: " + String(food_sat));
 }
 
-void minecraft::keepAlive(uint64_t id){
-    while(writing);
-    writing = true;
-    if(compression_enabled){
-        writeVarInt(10);
-        writeVarInt(0); // empty data length
-        writeVarInt(0x0F);
-    } else {
-        writeVarInt(9);
-        writeVarInt(0x0F);
-    }
-    writeLong(id);
-    writing = false;
+void minecraft::readPlayerPosAndLook(){
+    x = readDouble();
+    y = readDouble();
+    z = readDouble();
+    yaw = readFloat();
+    pitch = readFloat();
+    uint8_t flags = readByte();
+    id = readVarInt();
+
+    login("player pos and look X: " + String(x)
+                    + " Y: " + String(y)
+                    + " Z: " + String(z)
+                    + " yaw: " + String(yaw)
+                    + " pitch: " + String(pitch)
+                    + " flags: " + String(flags)
+                    + " id: " + String(id));
+
+    writeTeleportConfirm(id);
 }
 
-void minecraft::request(){
-    writeVarInt(1);
-    writeVarInt(0);
+void minecraft::readBlockDestroy(){
+    int ent_id = readVarInt();
+    long pos = readLong();
+    uint8_t stage = readByte();
+    login("block destroy id: " + String(ent_id)
+                    + " pos: " + String(pos)
+                    + " stage: " + String(stage));
 }
 
-void minecraft::ping(uint64_t num){
-    if(compression_enabled){
-        writeVarInt(10);  //packet lenght
-        writeVarInt(0);  // empty data length
-        writeVarInt(1);  //packet id
-    } else {
-        writeVarInt(9);  //packet lenght
-        writeVarInt(1);  //packet id
-    }
-    writeLong(num);
+void minecraft::readKeepAlive(){
+    uint64_t num = readLong();
+    writeKeepAlive(num);
+    login("received keepalive");
 }
 
-void minecraft::loginStart(){
-    if(compression_enabled){
-        writeVarInt(3 + username.length());
-        writeVarInt(0);  // empty data length
-        writeVarInt(0);
-    } else {
-        writeVarInt(2 + username.length());
-        writeVarInt(0); 
-    }
-    writeString(username);
+void minecraft::readChat(){
+    String chat = readString();
+    uint8_t pos = readByte();
+    uint64_t player_UUID = readUUID();
+    login("received message: " + chat + " sender type: " + String(pos));
+}
+
+void minecraft::readSetCompressionThres(){
+    int tres = readVarInt();
+    compression_treshold = tres;
+    compression_enabled = true;
+    loginfo("Compression treshold set to " + String(tres) + " bytes");
+}
+
+void minecraft::readDisconnected(){
+    login("disconnected reason: " + readString());
+}
+
+// SERVERBOUND
+void minecraft::writeTeleportConfirm(int id){
+    packet p(S, mtx, compression_enabled);
+    p.writeVarInt(0x00);
+    p.writeVarInt(id);
+    p.writePacket();
+}
+
+void minecraft::writeSetRotation(float yaw, float pitch, bool ground){
+    packet p(S, mtx, compression_enabled);
+    p.writeVarInt(0x14);
+    p.writeFloat(yaw);
+    p.writeFloat(pitch);
+    p.writeBoolean(ground?1:0);
+    p.writePacket();
+}
+
+void minecraft::writeKeepAlive(uint64_t id){
+    packet p(S, mtx, compression_enabled);
+    p.writeVarInt(0x10);
+    p.writeLong(id);
+    p.writePacket();
+    logout("keepalive sent");
+}
+
+void minecraft::writeRequest(){
+    packet p(S, mtx, compression_enabled);
+    p.writeVarInt(0x00);
+    p.writePacket();
+}
+
+void minecraft::writePing(){
+    packet p(S, mtx, compression_enabled);
+    p.writeVarInt(0x01);
+    p.writeLong(millis());
+    p.writePacket();
+}
+
+void minecraft::writeLoginStart(){
+    packet p(S, mtx, compression_enabled);
+    p.writeVarInt(0x00);
+    p.writeString(username);
+    p.writePacket();
 }
 
 void minecraft::writeChat(String text){
-    while(writing);
-    writing = true;
-    if(compression_enabled){
-        writeVarInt(3 + text.length());
-        writeVarInt(0);  // empty data length
-        writeVarInt(3);
-    } else {
-        writeVarInt(2 + text.length());
-        writeVarInt(3); 
-    }
-    writeString(text);
-    writing = false;
+    packet p(S, mtx, compression_enabled);
+    p.writeVarInt(0x03);
+    p.writeString(text);
+    p.writePacket();
 }
 
-void minecraft::handShake(uint8_t state){
-    if(compression_enabled){
-        writeVarInt(8 + server_url.length());
-        writeVarInt(0);  // empty data length
-        writeVarInt(0);
-    } else {
-        writeVarInt(7 + server_url.length());
-        writeVarInt(0);
-    }
-    writeVarInt(578);
-    writeString(server_url);
-    writeUnsignedShort(server_port);
-    writeVarInt(state);
+void minecraft::writeHandShake(uint8_t state){
+    packet p(S, mtx, compression_enabled);
+    p.writeVarInt(0x00);
+    p.writeVarInt(754);
+    p.writeString(server_url);
+    p.writeUnsignedShort(server_port);
+    p.writeVarInt(state);
+    p.writePacket();
 }
 
-void minecraft::clientStatus(uint8_t state){
-    if(compression_enabled){
-        writeVarInt(3);
-        writeVarInt(0);  // empty data length
-        writeVarInt(4);
-    } else {
-        writeVarInt(2);
-        writeVarInt(4);
-    }
-    writeVarInt(0);
+void minecraft::writeClientStatus(uint8_t state){
+    packet p(S, mtx, compression_enabled);
+    p.writeVarInt(0x04);
+    p.writeVarInt(state);
+    p.writePacket();
+}
+
+// READ TYPES
+uint16_t minecraft::readUnsignedShort(){
+    while(S->available() < 2);
+    int ret = S->read();
+    return (ret << 8) | S->read();
 }
 
 float minecraft::readFloat(){
@@ -153,26 +215,25 @@ double minecraft::readDouble(){
     return d;
 }
 
-long minecraft::readLong(){
+int64_t minecraft::readLong(){
     char b[8] = {};
     while(S->available() < 8);
     for(int i=0; i<8; i++){
         b[i] = S->read();
     }
-    long l = ((long) b[0] << 56)
-       | ((long) b[1] & 0xff) << 48
-       | ((long) b[2] & 0xff) << 40
-       | ((long) b[3] & 0xff) << 32
-       | ((long) b[4] & 0xff) << 24
-       | ((long) b[5] & 0xff) << 16
-       | ((long) b[6] & 0xff) << 8
-       | ((long) b[7] & 0xff);
+    uint64_t l = ((uint64_t) b[0] << 56)
+       | ((uint64_t) b[1] & 0xff) << 48
+       | ((uint64_t) b[2] & 0xff) << 40
+       | ((uint64_t) b[3] & 0xff) << 32
+       | ((uint64_t) b[4] & 0xff) << 24
+       | ((uint64_t) b[5] & 0xff) << 16
+       | ((uint64_t) b[6] & 0xff) << 8
+       | ((uint64_t) b[7] & 0xff);
     return l;
 }
 
 String minecraft::readString(){
     int length = readVarInt();
-    Serial.println("[INFO] <- text length to read: " + String(length) + " bytes");
     String result;
     for(int i=0; i<length; i++){
         while (S->available() < 1);
@@ -181,7 +242,7 @@ String minecraft::readString(){
     return result;
 }
 
-int minecraft::readVarInt() {
+int32_t minecraft::readVarInt() {
     int numRead = 0;
     int result = 0;
     byte read;
@@ -192,207 +253,215 @@ int minecraft::readVarInt() {
         result |= (value << (7 * numRead));
         numRead++;
         if (numRead > 5) {
-            Serial.println("[ERROR] VarInt too big");
+            logerr("VarInt too big");
         }
     } while ((read & 0b10000000) != 0);
     return result;
 }
 
-// private //
-int minecraft::VarIntLength(int val) {
-    if(val == 0){
-        return 1;
-    }
-    return (int)floor(log(val) / log(128)) + 1;
+uint8_t minecraft::readByte(){
+    return S->read();
 }
 
-void minecraft::writeDouble(double value){
+bool minecraft::readBool(){
+    return S->read();
+}
+
+uint64_t minecraft::readUUID(){
+    long UUIDmsb = readLong();
+    long UUIDlsb = readLong();
+    return (((uint64_t)UUIDmsb) << 32) + UUIDlsb;
+}
+
+// WRITE TYPES
+void packet::writeDouble(double value){
     unsigned char * p = reinterpret_cast<unsigned char *>(&value);
     for(int i=7; i>=0; i--){
-        S->write(p[i]);
+        write(p[i]);
     }
 }
 
-void minecraft::writeFloat(float value) {
+void packet::writeFloat(float value) {
     unsigned char * p = reinterpret_cast<unsigned char *>(&value);
     for(int i=3; i>=0; i--){
-        S->write(p[i]);
+        write(p[i]);
     }
 }
 
-void minecraft::writeVarInt(int16_t value) {
+void packet::writeVarInt(int32_t value) {
+    do {
+        uint8_t temp = (uint8_t)(value & 0b01111111);
+        value = lsr(value,7);
+        if (value != 0) {
+            temp |= 0b10000000;
+        }
+        write(temp);
+    } while (value != 0);
+}
+
+void packet::writeVarLong(int64_t value) {
     do {
         byte temp = (byte)(value & 0b01111111);
         value = lsr(value,7);
         if (value != 0) {
             temp |= 0b10000000;
         }
-        S->write(temp);
+        write(temp);
     } while (value != 0);
 }
 
-void minecraft::writeVarLong(int64_t value) {
-    do {
-        byte temp = (byte)(value & 0b01111111);
-        value = lsr(value,7);
-        if (value != 0) {
-            temp |= 0b10000000;
-        }
-        S->write(temp);
-    } while (value != 0);
-}
-
-void minecraft::writeString(String str){
+void packet::writeString(String str){
     int length = str.length();
     byte buf[length + 1]; 
     str.getBytes(buf, length + 1);
     writeVarInt(length);
-    for(int i=0; i<length; i++){
-        S->write(buf[i]);
-    }
+    write(buf, length);
+    /*for(int i=0; i<length; i++){
+        write(buf[i]);
+    }*/
 }
 
-void minecraft::writeLong(uint64_t num){
+void packet::writeLong(int64_t num){
     for(int i=7; i>=0; i--){
-        S->write((byte)((num >> (i*8)) & 0xff));
+        write((uint8_t)((num >> (i*8)) & 0xff));
     }
 }
 
-void minecraft::writeUnsignedShort(uint16_t num){
-    S->write((byte)((num >> 8) & 0xff));
-    S->write((byte)(num & 0xff));
+void packet::writeUnsignedLong(uint64_t num){
+    for(int i=7; i>=0; i--){
+        write((uint8_t)((num >> (i*8)) & 0xff));
+    }
 }
+
+void packet::writeUnsignedShort(uint16_t num){
+    write((byte)((num >> 8) & 0xff));
+    write((byte)(num & 0xff));
+}
+
+void packet::writeUnsignedByte(uint8_t num){
+    write(num);
+}
+
+void packet::writeInt(int32_t num){
+    write((byte)((num >> 24) & 0xff));
+    write((byte)((num >> 16) & 0xff));
+    write((byte)((num >> 8) & 0xff));
+    write((byte)(num & 0xff));
+}
+
+void packet::writeShort(int16_t num){
+    write((byte)((num >> 8) & 0xff));
+    write((byte)(num & 0xff));
+}
+
+void packet::writeByte(int8_t num){
+    write(num);
+}
+
+void packet::writeBoolean(uint8_t val){
+    write(val);
+}
+
+void packet::writeUUID(int user_id){
+    uint8_t b[15] = {0};
+    write(b, 15);
+    write(user_id);
+}
+
+void minecraft::writeLength(uint32_t length){
+    do {
+        uint8_t temp = (uint8_t)(length & 0b01111111);
+        length = lsr(length,7);
+        if (length != 0) {
+            temp |= 0b10000000;
+        }
+        S->write(temp);
+    } while (length != 0);
+}
+
 
 void minecraft::handle(){
-    while(1){
-        int pack_length = readVarInt();
-
-        if(compression_enabled){
-            int data_length = readVarInt();
-
-            if(data_length > compression_treshold){
-                int len = pack_length - VarIntLength(data_length);
-                uint8_t* buf;
-                buf = new uint8_t[len];
-
-                S->readBytes(buf, len);
-
-                delete [] buf;
-
-                // Serial.println("[INFO] <- packet received! pack_length: " + String(pack_length) + " data_length: " + String(data_length));
-            } else {
-                int id = readVarInt();
-
-                // Serial.print("[INFO] <- pack len: " + String(pack_length) + "B id: 0x");
-                // Serial.println(id, HEX);
-
-                switch (id){
-                    case 0x05:{
-                        int id = readVarInt();
-                        long UUIDmsb = readLong();
-                        long UUIDlsb = readLong();
-                        double px = readDouble();
-                        double py = readDouble();
-                        double pz = readDouble();
-                        uint8_t yaw = S->read();
-                        uint8_t pitch = S->read();
-                        
-                        Serial.println("[INFO] <- player found at X: " + String(px) + " Y: " + String(py) + " Z: " + String(pz));
-                        break;
-                    }
-                    case 0x49:{
-                        health = readFloat();
-                        food = readVarInt();
-                        food_sat = readFloat();
-
-                        Serial.println("[INFO] <- player stats health: " + String(health)
-                                        + " food: " + String(food)
-                                        + " food_sat: " + String(food_sat));
-                        
-                        break;
-                    }
-                    case 0x36:{
-                        x = readDouble();
-                        y = readDouble();
-                        z = readDouble();
-                        yaw = readFloat();
-                        pitch = readFloat();
-                        uint8_t flags = S->read();
-                        int id = readVarInt();
-                        teleported = true;
-
-                        Serial.println("[INFO] <- player pos and look X: " + String(x)
-                                        + " Y: " + String(y)
-                                        + " Z: " + String(z)
-                                        + " yaw: " + String(yaw)
-                                        + " pitch: " + String(pitch)
-                                        + " flags: " + String(flags)
-                                        + " id: " + String(id));
-
-                        teleportConfirm(id);
-                        break;
-                    }
-                    case 0x09:{
-                        int ent_id = readVarInt();
-                        long pos = readLong();
-                        uint8_t stage = S->read();
-                        Serial.println("[INFO] <- block destroy id: " + String(ent_id)
-                                        + " pos: " + String(pos)
-                                        + " stage: " + String(stage));
-                        break;
-                    }
-                    case 0x21:{
-                        long num = readLong();
-                        keepAlive(num);
-                        Serial.println("[INFO] <- received keepalive " + String(num));
-                        break;
-                    }
-                    case 0x0F:{
-                        String chat = readString();
-                        uint8_t pos = S->read();
-                        Serial.println("[INFO] <- received message: " + chat + " sender type: " + String(pos));
-                    }
-                    default:{
-                        for(int i=0; i < pack_length - VarIntLength(id) - VarIntLength(data_length); i++ ){
-                            while (S->available() < 1);
-                            S->read();
-                        }
-                        break;
-                    }
-                }
-            } 
+    int pack_length = readVarInt();
+    if(compression_enabled){
+        int data_length = readVarInt();
+        //login("cpr");
+        //login("compr len: " + String(pack_length) + "B data len: " + String(data_length));
+        if(data_length != 0){
+            int len = pack_length - VarIntLength(data_length);
+            S->readBytes(buf, len);
         } else {
             int id = readVarInt();
-
-            Serial.print("[INFO] <- Received packet length: " + String(pack_length) + " bytes packet id: 0x");
-            Serial.println(id, HEX);
-
+            //login("id " + String(id, HEX));
             switch (id){
-                case 0x03:{
-                    int tres = readVarInt();
-                    compression_treshold = tres;
-                    compression_enabled = true;
+                case 0x04:
+                    readSpawnPlayer();
+                    break;
+                case 0x49:
+                    readFoodAndSat();
+                    break;
+                case 0x34:
+                    readPlayerPosAndLook();
+                    break;
+                case 0x08:
+                    readBlockDestroy();
+                    break;
+                case 0x1F:
+                    readKeepAlive();
+                    break;
+                case 0x0E:
+                    readChat();
+                    break;
+                default:
+                    int len = pack_length - VarIntLength(id) - VarIntLength(data_length);
+                    S->readBytes(buf, len);
+                    break;
+            }
+        } 
+    } else {
+        int id = readVarInt();
+        login("pack len: " + String(pack_length) + "B id: 0x" + String(id, HEX));
 
-                    Serial.println("[INFO] * Compression treshold set to " + String(tres) + " bytes");
-
-                    break;
+        switch (id){
+            case 0x03:
+                readSetCompressionThres();
+                break;
+            case 0x00:
+                readDisconnected();
+                break;
+            default:{
+                for(int i=0; i<pack_length - 1; i++ ){
+                    S->read();
                 }
-                case 0x00:{
-                    String str = readString();
-                    Serial.println("[INFO] <- text Received: " + str);
-                    break;
-                }
-                default:{
-                    for(int i=0; i<pack_length - 1; i++ ){
-                        S->read();
-                    }
-                    break;
-                }
+                break;
             }
         }
     }
 }
 
-int lsr(int x, int n){
-  return (int)((unsigned int)x >> n);
+// UTILITIES
+void minecraft::loginfo(String msg){
+    Serial.println( "[INFO] " + msg);
+}
+
+void minecraft::logerr(String msg){
+    Serial.println( "[ERROR] " + msg);
+}
+
+void minecraft::login(String msg){
+    Serial.println( "[INFO] <- " + msg);
+}
+
+void minecraft::logout(String msg){
+    Serial.println( "[INFO] -> " + msg);
+}
+
+int32_t lsr(int32_t x, uint32_t n){
+  return (int32_t)((uint32_t)x >> n);
+}
+
+uint32_t minecraft::VarIntLength(int32_t val) {
+    if(val == 0){
+        return 1;
+    }
+    return (int)floor(log(val) / log(128)) + 1;
 }
