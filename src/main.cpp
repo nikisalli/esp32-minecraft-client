@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <minecraft.h>
-#include <credentials.h>
+#include <config.h>
 //#include "../src/miniz.h"
 
 TaskHandle_t listener;
