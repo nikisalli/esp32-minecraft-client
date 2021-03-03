@@ -38,7 +38,7 @@ void setup() {
         return;
     }
 
-    xTaskCreatePinnedToCore(update, "listener", 100000, NULL, 10, &listener, 0);
+    xTaskCreatePinnedToCore(update, "listener", 100000, NULL, 2, &listener, 0);
 
     mc.writeHandShake(2);
     vTaskDelay(pdMS_TO_TICKS(500));
