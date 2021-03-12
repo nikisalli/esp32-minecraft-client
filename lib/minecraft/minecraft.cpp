@@ -146,18 +146,12 @@ void minecraft::readWindowItems(){
     uint8_t windowid = readByte();
     uint32_t elementnum = readShort();
     for(int i = 0; i < elementnum; i++){
-        bool present = readByte();
-        if(present){
-            uint32_t itemid = readVarInt();
-            uint32_t itemCount = readByte();
-            uint8_t NBT_len = readVarInt();
+        slot temp = readSlot();
+        if(temp.present){
             login("window id: " + String(windowid) + 
-                  " itemid: " + String(itemid) + 
-                  " count: " + String(itemCount) + 
+                  " itemid: " + String(temp.id) + 
+                  " count: " + String(temp.count) + 
                   " at slot: " + String(elementnum));
-            if(NBT_len != 0){
-                dumpBytes(NBT_len);
-            }
         } else {
             continue;
         }
@@ -167,18 +161,12 @@ void minecraft::readWindowItems(){
 void minecraft::readSetSlot(){
     uint8_t windowid = readByte();
     uint32_t elementnum = readShort();
-    bool present = readByte();
-    if(present){
-        uint32_t itemid = readVarInt();
-        uint32_t itemCount = readByte();
-        uint8_t NBT_len = readVarInt();
+    slot temp = readSlot();
+    if(temp.present){
         login("window id: " + String(windowid) + 
-                " itemid: " + String(itemid) + 
-                " count: " + String(itemCount) + 
+                " itemid: " + String(temp.id) + 
+                " count: " + String(temp.count) + 
                 " at slot: " + String(elementnum));
-        if(NBT_len != 0){
-            dumpBytes(NBT_len);
-        }
     }
 }
 
@@ -202,8 +190,8 @@ void minecraft::readSpawnEntity(){
         readShort();
         readShort();
         entity_map[eid] = entity{ex, ey, ez, etype};
-        login("entity id: " + String(eid) + " type: " + String(etype) +
-              " coords: " + String(ex) + " " + String(ey) + " " + String(ez));
+        // login("entity id: " + String(eid) + " type: " + String(etype) +
+        //       " coords: " + String(ex) + " " + String(ey) + " " + String(ez));
     }
 }
 
@@ -211,11 +199,21 @@ void minecraft::readDestroyEntity(){
     uint32_t count = readVarInt();
     while(count){
         uint32_t entity_to_destroy = readVarInt();
+        std::map<uint32_t, entity>::iterator entity_map_iterator;
         entity_map_iterator = entity_map.find('b');
         if (entity_map_iterator != entity_map.end())
             entity_map.erase (entity_map_iterator);
         count--;
-        login("removed entity id: " + String(entity_to_destroy));
+        // login("removed entity id: " + String(entity_to_destroy));
+    }
+}
+
+void minecraft::readTradeList(){
+    uint8_t window_id = readVarInt();
+    uint8_t trade_num = readByte();
+    while(trade_num){
+
+        trade_num--;
     }
 }
 
@@ -437,6 +435,20 @@ uint64_t minecraft::readUUID(){
 void minecraft::dumpBytes(uint32_t len){
     uint8_t buf[1000];
     S->readBytes(buf, len);
+}
+
+slot minecraft::readSlot(){
+    slot ret;
+    ret.present = readByte();
+    if(ret.present){
+        ret.id = readVarInt();
+        ret.count = readByte();
+        uint8_t NBT_len = readVarInt();
+        if(NBT_len != 0){
+            dumpBytes(NBT_len);
+        }
+    }
+    return ret;
 }
 
 // WRITE TYPES

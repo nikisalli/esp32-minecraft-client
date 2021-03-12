@@ -44,16 +44,22 @@ class packet{
     void serverWriteVarInt  (int32_t value);
 };
 
+struct entity{
+    float x;
+    float y;
+    float z;
+    int32_t type;
+};
+
+struct slot{
+    bool present;
+    uint32_t id;
+    uint8_t count;
+};
+
 class minecraft{
     public:
     minecraft(String _username, String _url, uint16_t _port, Stream* __S);
-
-    struct entity{
-        int32_t x;
-        int32_t y;
-        int32_t z;
-        int32_t type;
-    };
 
     String username;
     String server_url;
@@ -61,7 +67,6 @@ class minecraft{
     std::mutex * mtx;
     Stream* S;
     std::map<uint32_t, entity> entity_map;
-    std::map<uint32_t, entity>::iterator entity_map_iterator;
 
     uint8_t game_state = 0; // 0: login 1: play
     int id;
@@ -111,7 +116,9 @@ class minecraft{
     void readSetSlot             ();
     void readSpawnEntity         ();
     void readDestroyEntity       ();
+    void readTradeList           ();
 
+    // serverbound
     void writeHandle             ();  // this stream is the logging port not the web socket!!
     void writeTeleportConfirm    (int id);
     void writeSetRotation        (float yaw, float pitch, bool ground);
@@ -144,6 +151,7 @@ class minecraft{
     bool readBool           ();
     uint64_t readUUID       ();
     void dumpBytes          (uint32_t len);
+    slot readSlot           ();
 
     void writeLength        (uint32_t length);
 };

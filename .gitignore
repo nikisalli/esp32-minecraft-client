@@ -2,3 +2,4 @@
 .vscode
 config.h
 .vscode-ctags
+src/trader_bot

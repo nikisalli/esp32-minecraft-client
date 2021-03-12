@@ -53,9 +53,5 @@ void loop(){
     if(mc.health < 0.01){
         mc.writeClientStatus(0);
     }
-    // mc.writeInteractAt(0, 0, 0, -129, 65, -62);
     vTaskDelay(pdMS_TO_TICKS(1000));
-
-    //Serial.println("[INFO] # buf: " + String(client.available()/1024.0) + "kB Heap: " + String(ESP.getFreeHeap()/1024.0) + "kB");
-    //mc.writeChat(client, "[nik INFO] Heap: " + String(ESP.getFreeHeap()/1024.0) + "kB || buf: " + String(client.available()/1024.0) + "kB");
 }
