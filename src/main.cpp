@@ -2,7 +2,6 @@
 #include <WiFi.h>
 #include <minecraft.h>
 #include <config.h>
-//#include "../src/miniz.h"
 
 TaskHandle_t listener;
 WiFiClient client;
@@ -50,6 +49,9 @@ void setup() {
 }
 
 void loop(){
+    if(mc.health < 0.01){
+        mc.writeClientStatus(0);
+    }
     mc.yaw+=10;
     if(mc.yaw > 360){
         mc.yaw = 0;

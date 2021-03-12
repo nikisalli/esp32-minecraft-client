@@ -117,6 +117,71 @@ void minecraft::readDisconnected(){
     login("disconnected reason: " + readString());
 }
 
+void minecraft::readServerDifficulty(){
+    uint8_t diff = readByte();
+    bool locked = readBool();
+    login("Server difficulty: " + String(diff) + " locked: " + String(locked));
+}
+
+void minecraft::readHeldItem(){
+    held_item = readByte();
+    login("held item: " + String(held_item));
+}
+
+void minecraft::readExperience(){
+    float bar = readFloat();
+    int level = readVarInt();
+    experience = readVarInt();
+    login("exp bar: " + String(bar) + " level: " + String(level) + " total: " + String(experience));
+}
+
+void minecraft::readSpawnPoint(){
+    uint64_t val = readUnsignedLong();
+    login("world spawn point: " + String((uint32_t)(val >> 38)) + " " + 
+                                  String((uint32_t)(val & 0xFFF)) + " " + 
+                                  String((uint32_t)(val << 26 >> 38)));
+}
+
+void minecraft::readWindowItems(){
+    uint8_t windowid = readByte();
+    uint32_t elementnum = readShort();
+    for(int i = 0; i < elementnum; i++){
+        bool present = readByte();
+        if(present){
+            uint32_t itemid = readVarInt();
+            uint32_t itemCount = readByte();
+            uint8_t NBT_len = readVarInt();
+            login("window id: " + String(windowid) + 
+                  " itemid: " + String(itemid) + 
+                  " count: " + String(itemCount) + 
+                  " at slot: " + String(elementnum));
+            if(NBT_len != 0){
+                dumpBytes(NBT_len);
+            }
+        } else {
+            continue;
+        }
+    }
+}
+
+void minecraft::readSetSlot(){
+    uint8_t windowid = readByte();
+    uint32_t elementnum = readShort();
+    bool present = readByte();
+    if(present){
+        uint32_t itemid = readVarInt();
+        uint32_t itemCount = readByte();
+        uint8_t NBT_len = readVarInt();
+        login("window id: " + String(windowid) + 
+                " itemid: " + String(itemid) + 
+                " count: " + String(itemCount) + 
+                " at slot: " + String(elementnum));
+        if(NBT_len != 0){
+            dumpBytes(NBT_len);
+        }
+    }
+}
+
 // SERVERBOUND
 void minecraft::writeTeleportConfirm(int id){
     packet p(S, mtx, compression_enabled);
@@ -193,6 +258,12 @@ uint16_t minecraft::readUnsignedShort(){
     return (ret << 8) | S->read();
 }
 
+int16_t minecraft::readShort(){
+    while(S->available() < 2);
+    int ret = S->read();
+    return (ret << 8) | S->read();
+}
+
 float minecraft::readFloat(){
     char b[4] = {};
     while(S->available() < 4);
@@ -216,6 +287,23 @@ double minecraft::readDouble(){
 }
 
 int64_t minecraft::readLong(){
+    char b[8] = {};
+    while(S->available() < 8);
+    for(int i=0; i<8; i++){
+        b[i] = S->read();
+    }
+    uint64_t l = ((uint64_t) b[0] << 56)
+       | ((uint64_t) b[1] & 0xff) << 48
+       | ((uint64_t) b[2] & 0xff) << 40
+       | ((uint64_t) b[3] & 0xff) << 32
+       | ((uint64_t) b[4] & 0xff) << 24
+       | ((uint64_t) b[5] & 0xff) << 16
+       | ((uint64_t) b[6] & 0xff) << 8
+       | ((uint64_t) b[7] & 0xff);
+    return l;
+}
+
+uint64_t minecraft::readUnsignedLong(){
     char b[8] = {};
     while(S->available() < 8);
     for(int i=0; i<8; i++){
@@ -271,6 +359,11 @@ uint64_t minecraft::readUUID(){
     long UUIDmsb = readLong();
     long UUIDlsb = readLong();
     return (((uint64_t)UUIDmsb) << 32) + UUIDlsb;
+}
+
+void minecraft::dumpBytes(uint32_t len){
+    uint8_t buf[1000];
+    S->readBytes(buf, len);
 }
 
 // WRITE TYPES
@@ -385,33 +478,33 @@ void minecraft::handle(){
     if(compression_enabled){
         int data_length = readVarInt();
         //login("cpr");
-        //login("compr len: " + String(pack_length) + "B data len: " + String(data_length));
         if(data_length != 0){
             int len = pack_length - VarIntLength(data_length);
             S->readBytes(buf, len);
+            //login("compr len: " + String(pack_length) + "B data len: " + String(data_length));
         } else {
             int id = readVarInt();
-            //login("id " + String(id, HEX));
             switch (id){
-                case 0x04:
-                    readSpawnPlayer();
-                    break;
-                case 0x49:
-                    readFoodAndSat();
-                    break;
-                case 0x34:
-                    readPlayerPosAndLook();
-                    break;
-                case 0x08:
-                    readBlockDestroy();
-                    break;
-                case 0x1F:
-                    readKeepAlive();
-                    break;
-                case 0x0E:
-                    readChat();
-                    break;
+                case 0x04: readSpawnPlayer(); break;
+                case 0x49: readFoodAndSat(); break;
+                case 0x34: readPlayerPosAndLook(); break;
+                case 0x08: readBlockDestroy(); break;
+                case 0x1F: readKeepAlive(); break;
+                case 0x0E: readChat(); break;
+                case 0x0D: readServerDifficulty(); break;
+                case 0x3F: readHeldItem(); break;
+                case 0x48: readExperience(); break;
+                case 0x42: readSpawnPoint(); break;
+                case 0x13: readWindowItems(); break;
+                case 0x15: readSetSlot(); break;
                 default:
+                    for(auto b : blacklisted_packets){
+                        if(id == b){
+                            goto out;
+                        }
+                    }
+                    login("id " + String(id, HEX));
+                    out:
                     int len = pack_length - VarIntLength(id) - VarIntLength(data_length);
                     S->readBytes(buf, len);
                     break;
@@ -419,7 +512,7 @@ void minecraft::handle(){
         } 
     } else {
         int id = readVarInt();
-        login("pack len: " + String(pack_length) + "B id: 0x" + String(id, HEX));
+        // login("pack len: " + String(pack_length) + "B id: 0x" + String(id, HEX));
 
         switch (id){
             case 0x03:
