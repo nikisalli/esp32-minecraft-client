@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include <mutex>
+#include <map>
 //#include "rom/miniz.h"
 
 class packet{
@@ -47,11 +48,21 @@ class minecraft{
     public:
     minecraft(String _username, String _url, uint16_t _port, Stream* __S);
 
+    struct entity{
+        int32_t x;
+        int32_t y;
+        int32_t z;
+        int32_t type;
+    };
+
     String username;
     String server_url;
     uint32_t server_port;
     std::mutex * mtx;
     Stream* S;
+    std::map<uint32_t, entity> entity_map;
+    std::map<uint32_t, entity>::iterator entity_map_iterator;
+
     uint8_t game_state = 0; // 0: login 1: play
     int id;
     bool compression_enabled = 0;
@@ -71,6 +82,8 @@ class minecraft{
     uint8_t buf[50000];
     uint8_t held_item = 0;
     uint32_t experience = 0;
+
+    // these won't show in logs
     uint8_t blacklisted_packets[27] = {0x55, 0x17, 0x30, 0x1A, 0x35, 0x32, 0x40, 0x3A, 0x27, 0x44,
                                        0x46, 0x28, 0x56, 0x58, 0x4E, 0x36, 0x47, 0x00, 0x29, 0x0b,
                                        0x21, 0x4B, 0x3D, 0x51, 0x3B, 0x22, 0x05};
@@ -97,6 +110,7 @@ class minecraft{
     void readWindowItems         ();
     void readSetSlot             ();
     void readSpawnEntity         ();
+    void readDestroyEntity       ();
 
     void writeHandle             ();  // this stream is the logging port not the web socket!!
     void writeTeleportConfirm    (int id);

@@ -201,8 +201,21 @@ void minecraft::readSpawnEntity(){
         readShort(); // we don't need velocity
         readShort();
         readShort();
+        entity_map[eid] = entity{ex, ey, ez, etype};
         login("entity id: " + String(eid) + " type: " + String(etype) +
               " coords: " + String(ex) + " " + String(ey) + " " + String(ez));
+    }
+}
+
+void minecraft::readDestroyEntity(){
+    uint32_t count = readVarInt();
+    while(count){
+        uint32_t entity_to_destroy = readVarInt();
+        entity_map_iterator = entity_map.find('b');
+        if (entity_map_iterator != entity_map.end())
+            entity_map.erase (entity_map_iterator);
+        count--;
+        login("removed entity id: " + String(entity_to_destroy));
     }
 }
 
@@ -557,6 +570,7 @@ void minecraft::readCompressed(){
             case 0x13: readWindowItems(); break;
             case 0x15: readSetSlot(); break;
             case 0x02: readSpawnEntity(); break;
+            case 0x36: readDestroyEntity(); break;
             default:
                 for(auto b : blacklisted_packets){
                     if(id == b){
