@@ -145,13 +145,14 @@ void minecraft::readSpawnPoint(){
 void minecraft::readWindowItems(){
     uint8_t windowid = readByte();
     uint32_t elementnum = readShort();
+    login("reading " + String(elementnum) + " window items...");
     for(int i = 0; i < elementnum; i++){
         slot temp = readSlot();
         if(temp.present){
-            login("window id: " + String(windowid) + 
+            login(" |-window id: " + String(windowid) + 
                   " itemid: " + String(temp.id) + 
                   " count: " + String(temp.count) + 
-                  " at slot: " + String(elementnum));
+                  " at slot: " + String(i));
         } else {
             continue;
         }
@@ -163,7 +164,7 @@ void minecraft::readSetSlot(){
     uint32_t elementnum = readShort();
     slot temp = readSlot();
     if(temp.present){
-        login("window id: " + String(windowid) + 
+        login("## window id: " + String(windowid) + 
                 " itemid: " + String(temp.id) + 
                 " count: " + String(temp.count) + 
                 " at slot: " + String(elementnum));
@@ -211,10 +212,31 @@ void minecraft::readDestroyEntity(){
 void minecraft::readTradeList(){
     uint8_t window_id = readVarInt();
     uint8_t trade_num = readByte();
+    login("reading trade list...");
     while(trade_num){
-
+        slot input = readSlot();
+        slot output = readSlot();
+        slot opt;
+        if(readByte()){
+            opt = readSlot();
+        }
+        bool trade_disabled = readByte();
+        int32_t trade_uses = readInt();
+        int32_t max_trade_uses = readInt();
+        int32_t xp = readInt();
+        int32_t special_price = readInt();
+        float price_multiplier = readFloat();
+        int32_t demand = readInt();
         trade_num--;
+        login(" |- input_id: " + String(input.id) +
+              " output_id: " + String(output.id) +
+              " used_trades: " + String(trade_uses) + "/" + String(max_trade_uses));
     }
+    uint32_t villager_level = readVarInt();
+    uint32_t villager_xp = readVarInt();
+    bool regular_villager = readByte();
+    bool can_restock = readByte();
+    loginfo("### villager_exp: " + String(villager_xp) + " villager_level: " + String(villager_level));
 }
 
 // SERVERBOUND
@@ -322,6 +344,19 @@ void minecraft::writeAttack(uint32_t entityid, uint8_t hand, bool sneaking){
     logout("attack sent");
 }
 
+void minecraft::writeClickWindow(uint8_t window_id, int16_t slot_id, uint8_t button, int16_t action_id, uint8_t mode, slot item){
+    packet p(S, mtx, compression_enabled);
+    p.writeVarInt(0x09);
+    p.writeByte(window_id);
+    p.writeShort(slot_id);
+    p.writeByte(button);
+    p.writeShort(action_id);
+    p.writeVarInt(mode);
+    p.writeSlot(item);
+    p.writePacket();
+    logout("attack sent");
+}
+
 // READ TYPES
 uint16_t minecraft::readUnsignedShort(){
     while(S->available() < 2);
@@ -359,10 +394,7 @@ double minecraft::readDouble(){
 
 int64_t minecraft::readLong(){
     char b[8] = {};
-    while(S->available() < 8);
-    for(int i=0; i<8; i++){
-        b[i] = S->read();
-    }
+    S->readBytes(b, 8);
     uint64_t l = ((uint64_t) b[0] << 56)
        | ((uint64_t) b[1] & 0xff) << 48
        | ((uint64_t) b[2] & 0xff) << 40
@@ -376,10 +408,7 @@ int64_t minecraft::readLong(){
 
 uint64_t minecraft::readUnsignedLong(){
     char b[8] = {};
-    while(S->available() < 8);
-    for(int i=0; i<8; i++){
-        b[i] = S->read();
-    }
+    S->readBytes(b, 8);
     uint64_t l = ((uint64_t) b[0] << 56)
        | ((uint64_t) b[1] & 0xff) << 48
        | ((uint64_t) b[2] & 0xff) << 40
@@ -449,6 +478,26 @@ slot minecraft::readSlot(){
         }
     }
     return ret;
+}
+
+int32_t minecraft::readInt(){
+    char b[4] = {};
+    S->readBytes(b, 4);
+    uint32_t l = ((uint32_t) b[0] << 24)
+       | ((uint32_t) b[1] & 0xff) << 16
+       | ((uint32_t) b[2] & 0xff) << 8
+       | ((uint32_t) b[3] & 0xff);
+    return l;
+}
+
+uint32_t minecraft::readUnsignedInt(){
+    char b[4] = {};
+    S->readBytes(b, 4);
+    uint32_t l = ((uint32_t) b[0] << 24)
+       | ((uint32_t) b[1] & 0xff) << 16
+       | ((uint32_t) b[2] & 0xff) << 8
+       | ((uint32_t) b[3] & 0xff);
+    return l;
 }
 
 // WRITE TYPES
@@ -546,6 +595,15 @@ void packet::writeUUID(int user_id){
     write(user_id);
 }
 
+void packet::writeSlot(slot item){
+    writeByte(item.present);
+    if(item.present){
+        writeVarInt(item.id);
+        writeByte(item.count);
+        writeByte(0); // no NBT data
+    }
+}
+
 void minecraft::writeLength(uint32_t length){
     do {
         uint8_t temp = (uint8_t)(length & 0b01111111);
@@ -583,6 +641,7 @@ void minecraft::readCompressed(){
             case 0x15: readSetSlot(); break;
             case 0x02: readSpawnEntity(); break;
             case 0x36: readDestroyEntity(); break;
+            case 0x26: readTradeList(); break;
             default:
                 for(auto b : blacklisted_packets){
                     if(id == b){

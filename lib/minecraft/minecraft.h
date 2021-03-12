@@ -39,6 +39,7 @@ class packet{
     void writeByte          (int8_t num);
     void writeBoolean       (uint8_t val);
     void writeUUID          (int user_id);
+    void writeSlot          (slot item);
 
     // write to server
     void serverWriteVarInt  (int32_t value);
@@ -72,6 +73,7 @@ class minecraft{
     int id;
     bool compression_enabled = 0;
     int compression_treshold = 0;
+    slot inventory[36];
     bool writing = 0;
     double x = 0;
     double y = 0;
@@ -132,6 +134,7 @@ class minecraft{
     void writeInteract           (uint32_t entityid, uint8_t hand, bool sneaking);
     void writeInteractAt         (uint32_t entityid, uint8_t hand, bool sneaking, uint32_t x, uint32_t y, uint32_t z);
     void writeAttack             (uint32_t entityid, uint8_t hand, bool sneaking);
+    void writeClickWindow        (uint8_t window_id, int16_t slot_id, uint8_t button, int16_t action_id, uint8_t mode, slot item);
 
     void loginfo            (String msg);
     void logerr             (String msg);
@@ -146,6 +149,8 @@ class minecraft{
     uint64_t readUnsignedLong();
     int16_t readShort       ();
     uint16_t readUnsignedShort();
+    int32_t readInt         ();
+    uint32_t readUnsignedInt();
     uint32_t VarIntLength   (int32_t val);
     uint8_t readByte        ();
     bool readBool           ();
