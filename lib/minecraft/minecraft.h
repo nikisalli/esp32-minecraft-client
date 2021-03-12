@@ -52,6 +52,7 @@ class minecraft{
     uint32_t server_port;
     std::mutex * mtx;
     Stream* S;
+    uint8_t game_state = 0; // 0: login 1: play
     int id;
     bool compression_enabled = 0;
     int compression_treshold = 0;
@@ -70,13 +71,15 @@ class minecraft{
     uint8_t buf[50000];
     uint8_t held_item = 0;
     uint32_t experience = 0;
-    uint8_t blacklisted_packets[28] = {0x02, 0x17, 0x30, 0x1A, 0x35, 0x32, 0x40, 0x3A, 0x27, 0x44,
+    uint8_t blacklisted_packets[27] = {0x55, 0x17, 0x30, 0x1A, 0x35, 0x32, 0x40, 0x3A, 0x27, 0x44,
                                        0x46, 0x28, 0x56, 0x58, 0x4E, 0x36, 0x47, 0x00, 0x29, 0x0b,
-                                       0x21, 0x4B, 0x3D, 0x51, 0x3B, 0x22, 0x05, 0x55};
+                                       0x21, 0x4B, 0x3D, 0x51, 0x3B, 0x22, 0x05};
 
     int timeout = 100;
 
     void handle();
+    void readUncompressed();
+    void readCompressed();
 
     // clientbound
     void readSpawnPlayer         ();
@@ -93,6 +96,7 @@ class minecraft{
     void readSpawnPoint          ();
     void readWindowItems         ();
     void readSetSlot             ();
+    void readSpawnEntity         ();
 
     void writeHandle             ();  // this stream is the logging port not the web socket!!
     void writeTeleportConfirm    (int id);
@@ -104,6 +108,9 @@ class minecraft{
     void writeChat               (String text);
     void writeHandShake          (uint8_t state);
     void writeClientStatus       (uint8_t state);
+    void writeInteract           (uint32_t entityid, uint8_t hand, bool sneaking);
+    void writeInteractAt         (uint32_t entityid, uint8_t hand, bool sneaking, uint32_t x, uint32_t y, uint32_t z);
+    void writeAttack             (uint32_t entityid, uint8_t hand, bool sneaking);
 
     void loginfo            (String msg);
     void logerr             (String msg);

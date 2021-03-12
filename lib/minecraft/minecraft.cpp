@@ -47,7 +47,7 @@ minecraft::minecraft(String _username, String _url, uint16_t _port, Stream* __S)
 // CLIENTBOUND
 void minecraft::readSpawnPlayer(){
     int id = readVarInt();
-    uint64_t player_UUID = readUUID();
+    readUUID();
     double px = readDouble();
     double py = readDouble();
     double pz = readDouble();
@@ -182,6 +182,30 @@ void minecraft::readSetSlot(){
     }
 }
 
+void minecraft::readSpawnEntity(){
+    if(game_state == 0){ // login success
+        readUUID();
+        readString();
+        game_state = 1; // now the client is in play state
+        login("login success");
+    } else if(game_state == 1) { // spawn entity
+        uint32_t eid = readVarInt();
+        readUUID();
+        uint32_t etype = readVarInt();
+        double ex = readDouble();
+        double ey = readDouble();
+        double ez = readDouble();
+        readByte(); // we don't need heading
+        readByte();
+        readByte();
+        readShort(); // we don't need velocity
+        readShort();
+        readShort();
+        login("entity id: " + String(eid) + " type: " + String(etype) +
+              " coords: " + String(ex) + " " + String(ey) + " " + String(ez));
+    }
+}
+
 // SERVERBOUND
 void minecraft::writeTeleportConfirm(int id){
     packet p(S, mtx, compression_enabled);
@@ -249,6 +273,42 @@ void minecraft::writeClientStatus(uint8_t state){
     p.writeVarInt(0x04);
     p.writeVarInt(state);
     p.writePacket();
+}
+
+void minecraft::writeInteract(uint32_t entityid, uint8_t hand, bool sneaking){
+    packet p(S, mtx, compression_enabled);
+    p.writeVarInt(0x0E);
+    p.writeVarInt(entityid);
+    p.writeVarInt(0);
+    p.writeVarInt(hand);
+    p.writeBoolean(sneaking);
+    p.writePacket();
+    logout("interact sent");
+}
+
+void minecraft::writeInteractAt(uint32_t entityid, uint8_t hand, bool sneaking, uint32_t x, uint32_t y, uint32_t z){
+    packet p(S, mtx, compression_enabled);
+    p.writeVarInt(0x0E);
+    p.writeVarInt(entityid);
+    p.writeVarInt(2);
+    p.writeFloat(x);
+    p.writeFloat(y);
+    p.writeFloat(z);
+    p.writeVarInt(hand);
+    p.writeBoolean(sneaking);
+    p.writePacket();
+    logout("interact at sent");
+}
+
+void minecraft::writeAttack(uint32_t entityid, uint8_t hand, bool sneaking){
+    packet p(S, mtx, compression_enabled);
+    p.writeVarInt(0x0E);
+    p.writeVarInt(entityid);
+    p.writeVarInt(1);
+    p.writeVarInt(hand);
+    p.writeBoolean(sneaking);
+    p.writePacket();
+    logout("attack sent");
 }
 
 // READ TYPES
@@ -358,7 +418,7 @@ bool minecraft::readBool(){
 uint64_t minecraft::readUUID(){
     long UUIDmsb = readLong();
     long UUIDlsb = readLong();
-    return (((uint64_t)UUIDmsb) << 32) + UUIDlsb;
+    return UUIDlsb;
 }
 
 void minecraft::dumpBytes(uint32_t len){
@@ -473,61 +533,66 @@ void minecraft::writeLength(uint32_t length){
 }
 
 
-void minecraft::handle(){
+void minecraft::readCompressed(){
     int pack_length = readVarInt();
-    if(compression_enabled){
-        int data_length = readVarInt();
-        //login("cpr");
-        if(data_length != 0){
-            int len = pack_length - VarIntLength(data_length);
-            S->readBytes(buf, len);
-            //login("compr len: " + String(pack_length) + "B data len: " + String(data_length));
-        } else {
-            int id = readVarInt();
-            switch (id){
-                case 0x04: readSpawnPlayer(); break;
-                case 0x49: readFoodAndSat(); break;
-                case 0x34: readPlayerPosAndLook(); break;
-                case 0x08: readBlockDestroy(); break;
-                case 0x1F: readKeepAlive(); break;
-                case 0x0E: readChat(); break;
-                case 0x0D: readServerDifficulty(); break;
-                case 0x3F: readHeldItem(); break;
-                case 0x48: readExperience(); break;
-                case 0x42: readSpawnPoint(); break;
-                case 0x13: readWindowItems(); break;
-                case 0x15: readSetSlot(); break;
-                default:
-                    for(auto b : blacklisted_packets){
-                        if(id == b){
-                            goto out;
-                        }
-                    }
-                    login("id " + String(id, HEX));
-                    out:
-                    int len = pack_length - VarIntLength(id) - VarIntLength(data_length);
-                    S->readBytes(buf, len);
-                    break;
-            }
-        } 
+    int data_length = readVarInt();
+    //login("cpr");
+    if(data_length != 0){
+        int len = pack_length - VarIntLength(data_length);
+        S->readBytes(buf, len);
+        //login("compr len: " + String(pack_length) + "B data len: " + String(data_length));
     } else {
         int id = readVarInt();
-        // login("pack len: " + String(pack_length) + "B id: 0x" + String(id, HEX));
-
         switch (id){
-            case 0x03:
-                readSetCompressionThres();
-                break;
-            case 0x00:
-                readDisconnected();
-                break;
-            default:{
-                for(int i=0; i<pack_length - 1; i++ ){
-                    S->read();
+            case 0x04: readSpawnPlayer(); break;
+            case 0x49: readFoodAndSat(); break;
+            case 0x34: readPlayerPosAndLook(); break;
+            case 0x08: readBlockDestroy(); break;
+            case 0x1F: readKeepAlive(); break;
+            case 0x0E: readChat(); break;
+            case 0x0D: readServerDifficulty(); break;
+            case 0x3F: readHeldItem(); break;
+            case 0x48: readExperience(); break;
+            case 0x42: readSpawnPoint(); break;
+            case 0x13: readWindowItems(); break;
+            case 0x15: readSetSlot(); break;
+            case 0x02: readSpawnEntity(); break;
+            default:
+                for(auto b : blacklisted_packets){
+                    if(id == b){
+                        goto out;
+                    }
                 }
+                login("id " + String(id, HEX));
+                out:
+                int len = pack_length - VarIntLength(id) - VarIntLength(data_length);
+                S->readBytes(buf, len);
                 break;
-            }
         }
+    }
+}
+
+void minecraft::readUncompressed(){
+    int pack_length = readVarInt();
+    int id = readVarInt();
+    switch (id){
+        case 0x03: readSetCompressionThres(); break;
+        case 0x00: readDisconnected(); break;
+        default:{
+            login("uncompressed pack len: " + String(pack_length) + "B id: 0x" + String(id, HEX));
+            for(int i=0; i<pack_length - 1; i++ ){
+                S->read();
+            }
+            break;
+        }
+    }
+}
+
+void minecraft::handle(){
+    if(compression_enabled){
+        readCompressed();
+    } else {
+        readUncompressed();
     }
 }
 
