@@ -6,6 +6,19 @@
 #include <map>
 //#include "rom/miniz.h"
 
+struct entity{
+    float x;
+    float y;
+    float z;
+    int32_t type;
+};
+
+struct slot{
+    bool present;
+    uint32_t id;
+    uint8_t count;
+};
+
 class packet{
     public:
     uint8_t buffer[6000];
@@ -45,19 +58,6 @@ class packet{
     void serverWriteVarInt  (int32_t value);
 };
 
-struct entity{
-    float x;
-    float y;
-    float z;
-    int32_t type;
-};
-
-struct slot{
-    bool present;
-    uint32_t id;
-    uint8_t count;
-};
-
 class minecraft{
     public:
     minecraft(String _username, String _url, uint16_t _port, Stream* __S);
@@ -89,11 +89,12 @@ class minecraft{
     uint8_t buf[50000];
     uint8_t held_item = 0;
     uint32_t experience = 0;
+    uint8_t windowid = 0;
 
     // these won't show in logs
-    uint8_t blacklisted_packets[27] = {0x55, 0x17, 0x30, 0x1A, 0x35, 0x32, 0x40, 0x3A, 0x27, 0x44,
+    uint8_t blacklisted_packets[29] = {0x55, 0x17, 0x30, 0x1A, 0x35, 0x32, 0x40, 0x3A, 0x27, 0x44,
                                        0x46, 0x28, 0x56, 0x58, 0x4E, 0x36, 0x47, 0x00, 0x29, 0x0b,
-                                       0x21, 0x4B, 0x3D, 0x51, 0x3B, 0x22, 0x05};
+                                       0x21, 0x4B, 0x3D, 0x51, 0x3B, 0x22, 0x05, 0x1c, 0x0A};
 
     int timeout = 100;
 
@@ -119,6 +120,7 @@ class minecraft{
     void readSpawnEntity         ();
     void readDestroyEntity       ();
     void readTradeList           ();
+    void readWindowConfirmation  ();
 
     // serverbound
     void writeHandle             ();  // this stream is the logging port not the web socket!!
@@ -135,6 +137,8 @@ class minecraft{
     void writeInteractAt         (uint32_t entityid, uint8_t hand, bool sneaking, uint32_t x, uint32_t y, uint32_t z);
     void writeAttack             (uint32_t entityid, uint8_t hand, bool sneaking);
     void writeClickWindow        (uint8_t window_id, int16_t slot_id, uint8_t button, int16_t action_id, uint8_t mode, slot item);
+    void writeWindowConfirmation (uint8_t window_id, int16_t action_num, bool accepted);
+    void writeCloseWindow        ();
 
     void loginfo            (String msg);
     void logerr             (String msg);

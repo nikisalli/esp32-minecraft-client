@@ -143,9 +143,9 @@ void minecraft::readSpawnPoint(){
 }
 
 void minecraft::readWindowItems(){
-    uint8_t windowid = readByte();
+    windowid = readByte();
     uint32_t elementnum = readShort();
-    login("reading " + String(elementnum) + " window items...");
+    login("windowID: " + String(windowid) + " reading " + String(elementnum) + " window items...");
     for(int i = 0; i < elementnum; i++){
         slot temp = readSlot();
         if(temp.present){
@@ -153,6 +153,7 @@ void minecraft::readWindowItems(){
                   " itemid: " + String(temp.id) + 
                   " count: " + String(temp.count) + 
                   " at slot: " + String(i));
+        
         } else {
             continue;
         }
@@ -160,7 +161,7 @@ void minecraft::readWindowItems(){
 }
 
 void minecraft::readSetSlot(){
-    uint8_t windowid = readByte();
+    windowid = readByte();
     uint32_t elementnum = readShort();
     slot temp = readSlot();
     if(temp.present){
@@ -210,9 +211,9 @@ void minecraft::readDestroyEntity(){
 }
 
 void minecraft::readTradeList(){
-    uint8_t window_id = readVarInt();
+    windowid = readVarInt();
     uint8_t trade_num = readByte();
-    login("reading trade list...");
+    login("windowID: " + String(windowid) + " reading trade list...");
     while(trade_num){
         slot input = readSlot();
         slot output = readSlot();
@@ -237,6 +238,14 @@ void minecraft::readTradeList(){
     bool regular_villager = readByte();
     bool can_restock = readByte();
     loginfo("### villager_exp: " + String(villager_xp) + " villager_level: " + String(villager_level));
+}
+
+void minecraft::readWindowConfirmation(){
+    windowid = readByte();
+    int16_t action_num = readShort();
+    bool accepted = readByte();
+    login("windowID: " + String(windowid) + " confirmation - accepted: " + String(accepted));
+    writeWindowConfirmation(windowid, action_num, accepted);
 }
 
 // SERVERBOUND
@@ -354,7 +363,25 @@ void minecraft::writeClickWindow(uint8_t window_id, int16_t slot_id, uint8_t but
     p.writeVarInt(mode);
     p.writeSlot(item);
     p.writePacket();
-    logout("attack sent");
+    logout("clicked window slot id " + String(slot_id));
+}
+
+void minecraft::writeWindowConfirmation(uint8_t window_id, int16_t action_num, bool accepted){
+    packet p(S, mtx, compression_enabled);
+    p.writeVarInt(0x07);
+    p.writeByte(window_id);
+    p.writeShort(action_num);
+    p.writeByte(accepted);
+    p.writePacket();
+    logout("windowID: " + String(window_id) + " confirmation sent");
+}
+
+void minecraft::writeCloseWindow(){
+    packet p(S, mtx, compression_enabled);
+    p.writeVarInt(0x0A);
+    p.writeByte(windowid);
+    p.writePacket();
+    logout("windowID: " + String(windowid) + " closed");
 }
 
 // READ TYPES
@@ -642,6 +669,8 @@ void minecraft::readCompressed(){
             case 0x02: readSpawnEntity(); break;
             case 0x36: readDestroyEntity(); break;
             case 0x26: readTradeList(); break;
+            case 0x11: readWindowConfirmation(); break;
+            case 0x19: readDisconnected(); break;
             default:
                 for(auto b : blacklisted_packets){
                     if(id == b){
