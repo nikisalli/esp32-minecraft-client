@@ -1,4 +1,6 @@
 .pio
 .vscode
 config.h
+nik_config.h
 .vscode-ctags
+src/trader_bot

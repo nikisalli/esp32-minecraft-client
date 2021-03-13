@@ -47,7 +47,7 @@ minecraft::minecraft(String _username, String _url, uint16_t _port, Stream* __S)
 // CLIENTBOUND
 void minecraft::readSpawnPlayer(){
     int id = readVarInt();
-    uint64_t player_UUID = readUUID();
+    readUUID();
     double px = readDouble();
     double py = readDouble();
     double pz = readDouble();
@@ -115,6 +115,137 @@ void minecraft::readSetCompressionThres(){
 
 void minecraft::readDisconnected(){
     login("disconnected reason: " + readString());
+}
+
+void minecraft::readServerDifficulty(){
+    uint8_t diff = readByte();
+    bool locked = readBool();
+    login("Server difficulty: " + String(diff) + " locked: " + String(locked));
+}
+
+void minecraft::readHeldItem(){
+    held_item = readByte();
+    login("held item: " + String(held_item));
+}
+
+void minecraft::readExperience(){
+    float bar = readFloat();
+    int level = readVarInt();
+    experience = readVarInt();
+    login("exp bar: " + String(bar) + " level: " + String(level) + " total: " + String(experience));
+}
+
+void minecraft::readSpawnPoint(){
+    uint64_t val = readUnsignedLong();
+    login("world spawn point: " + String((uint32_t)(val >> 38)) + " " + 
+                                  String((uint32_t)(val & 0xFFF)) + " " + 
+                                  String((uint32_t)(val << 26 >> 38)));
+}
+
+void minecraft::readWindowItems(){
+    windowid = readByte();
+    uint32_t elementnum = readShort();
+    login("windowID: " + String(windowid) + " reading " + String(elementnum) + " window items...");
+    for(int i = 0; i < elementnum; i++){
+        slot temp = readSlot();
+        if(temp.present){
+            login(" |-window id: " + String(windowid) + 
+                  " itemid: " + String(temp.id) + 
+                  " count: " + String(temp.count) + 
+                  " at slot: " + String(i));
+        
+        } else {
+            continue;
+        }
+    }
+}
+
+void minecraft::readSetSlot(){
+    windowid = readByte();
+    uint32_t elementnum = readShort();
+    slot temp = readSlot();
+    if(temp.present){
+        login("## window id: " + String(windowid) + 
+                " itemid: " + String(temp.id) + 
+                " count: " + String(temp.count) + 
+                " at slot: " + String(elementnum));
+    }
+}
+
+void minecraft::readSpawnEntity(){
+    if(game_state == 0){ // login success
+        readUUID();
+        readString();
+        game_state = 1; // now the client is in play state
+        login("login success");
+    } else if(game_state == 1) { // spawn entity
+        uint32_t eid = readVarInt();
+        readUUID();
+        uint32_t etype = readVarInt();
+        double ex = readDouble();
+        double ey = readDouble();
+        double ez = readDouble();
+        readByte(); // we don't need heading
+        readByte();
+        readByte();
+        readShort(); // we don't need velocity
+        readShort();
+        readShort();
+        entity_map[eid] = entity{ex, ey, ez, etype};
+        // login("entity id: " + String(eid) + " type: " + String(etype) +
+        //       " coords: " + String(ex) + " " + String(ey) + " " + String(ez));
+    }
+}
+
+void minecraft::readDestroyEntity(){
+    uint32_t count = readVarInt();
+    while(count){
+        uint32_t entity_to_destroy = readVarInt();
+        std::map<uint32_t, entity>::iterator entity_map_iterator;
+        entity_map_iterator = entity_map.find('b');
+        if (entity_map_iterator != entity_map.end())
+            entity_map.erase (entity_map_iterator);
+        count--;
+        // login("removed entity id: " + String(entity_to_destroy));
+    }
+}
+
+void minecraft::readTradeList(){
+    windowid = readVarInt();
+    uint8_t trade_num = readByte();
+    login("windowID: " + String(windowid) + " reading trade list...");
+    while(trade_num){
+        slot input = readSlot();
+        slot output = readSlot();
+        slot opt;
+        if(readByte()){
+            opt = readSlot();
+        }
+        bool trade_disabled = readByte();
+        int32_t trade_uses = readInt();
+        int32_t max_trade_uses = readInt();
+        int32_t xp = readInt();
+        int32_t special_price = readInt();
+        float price_multiplier = readFloat();
+        int32_t demand = readInt();
+        trade_num--;
+        login(" |- input_id: " + String(input.id) +
+              " output_id: " + String(output.id) +
+              " used_trades: " + String(trade_uses) + "/" + String(max_trade_uses));
+    }
+    uint32_t villager_level = readVarInt();
+    uint32_t villager_xp = readVarInt();
+    bool regular_villager = readByte();
+    bool can_restock = readByte();
+    loginfo("### villager_exp: " + String(villager_xp) + " villager_level: " + String(villager_level));
+}
+
+void minecraft::readWindowConfirmation(){
+    windowid = readByte();
+    int16_t action_num = readShort();
+    bool accepted = readByte();
+    login("windowID: " + String(windowid) + " confirmation - accepted: " + String(accepted));
+    writeWindowConfirmation(windowid, action_num, accepted);
 }
 
 // SERVERBOUND
@@ -186,8 +317,81 @@ void minecraft::writeClientStatus(uint8_t state){
     p.writePacket();
 }
 
+void minecraft::writeInteract(uint32_t entityid, uint8_t hand, bool sneaking){
+    packet p(S, mtx, compression_enabled);
+    p.writeVarInt(0x0E);
+    p.writeVarInt(entityid);
+    p.writeVarInt(0);
+    p.writeVarInt(hand);
+    p.writeBoolean(sneaking);
+    p.writePacket();
+    logout("interact sent");
+}
+
+void minecraft::writeInteractAt(uint32_t entityid, uint8_t hand, bool sneaking, uint32_t x, uint32_t y, uint32_t z){
+    packet p(S, mtx, compression_enabled);
+    p.writeVarInt(0x0E);
+    p.writeVarInt(entityid);
+    p.writeVarInt(2);
+    p.writeFloat(x);
+    p.writeFloat(y);
+    p.writeFloat(z);
+    p.writeVarInt(hand);
+    p.writeBoolean(sneaking);
+    p.writePacket();
+    logout("interact at sent");
+}
+
+void minecraft::writeAttack(uint32_t entityid, uint8_t hand, bool sneaking){
+    packet p(S, mtx, compression_enabled);
+    p.writeVarInt(0x0E);
+    p.writeVarInt(entityid);
+    p.writeVarInt(1);
+    p.writeVarInt(hand);
+    p.writeBoolean(sneaking);
+    p.writePacket();
+    logout("attack sent");
+}
+
+void minecraft::writeClickWindow(uint8_t window_id, int16_t slot_id, uint8_t button, int16_t action_id, uint8_t mode, slot item){
+    packet p(S, mtx, compression_enabled);
+    p.writeVarInt(0x09);
+    p.writeByte(window_id);
+    p.writeShort(slot_id);
+    p.writeByte(button);
+    p.writeShort(action_id);
+    p.writeVarInt(mode);
+    p.writeSlot(item);
+    p.writePacket();
+    logout("clicked window slot id " + String(slot_id));
+}
+
+void minecraft::writeWindowConfirmation(uint8_t window_id, int16_t action_num, bool accepted){
+    packet p(S, mtx, compression_enabled);
+    p.writeVarInt(0x07);
+    p.writeByte(window_id);
+    p.writeShort(action_num);
+    p.writeByte(accepted);
+    p.writePacket();
+    logout("windowID: " + String(window_id) + " confirmation sent");
+}
+
+void minecraft::writeCloseWindow(){
+    packet p(S, mtx, compression_enabled);
+    p.writeVarInt(0x0A);
+    p.writeByte(windowid);
+    p.writePacket();
+    logout("windowID: " + String(windowid) + " closed");
+}
+
 // READ TYPES
 uint16_t minecraft::readUnsignedShort(){
+    while(S->available() < 2);
+    int ret = S->read();
+    return (ret << 8) | S->read();
+}
+
+int16_t minecraft::readShort(){
     while(S->available() < 2);
     int ret = S->read();
     return (ret << 8) | S->read();
@@ -217,10 +421,21 @@ double minecraft::readDouble(){
 
 int64_t minecraft::readLong(){
     char b[8] = {};
-    while(S->available() < 8);
-    for(int i=0; i<8; i++){
-        b[i] = S->read();
-    }
+    S->readBytes(b, 8);
+    uint64_t l = ((uint64_t) b[0] << 56)
+       | ((uint64_t) b[1] & 0xff) << 48
+       | ((uint64_t) b[2] & 0xff) << 40
+       | ((uint64_t) b[3] & 0xff) << 32
+       | ((uint64_t) b[4] & 0xff) << 24
+       | ((uint64_t) b[5] & 0xff) << 16
+       | ((uint64_t) b[6] & 0xff) << 8
+       | ((uint64_t) b[7] & 0xff);
+    return l;
+}
+
+uint64_t minecraft::readUnsignedLong(){
+    char b[8] = {};
+    S->readBytes(b, 8);
     uint64_t l = ((uint64_t) b[0] << 56)
        | ((uint64_t) b[1] & 0xff) << 48
        | ((uint64_t) b[2] & 0xff) << 40
@@ -270,7 +485,46 @@ bool minecraft::readBool(){
 uint64_t minecraft::readUUID(){
     long UUIDmsb = readLong();
     long UUIDlsb = readLong();
-    return (((uint64_t)UUIDmsb) << 32) + UUIDlsb;
+    return UUIDlsb;
+}
+
+void minecraft::dumpBytes(uint32_t len){
+    uint8_t buf[1000];
+    S->readBytes(buf, len);
+}
+
+slot minecraft::readSlot(){
+    slot ret;
+    ret.present = readByte();
+    if(ret.present){
+        ret.id = readVarInt();
+        ret.count = readByte();
+        uint8_t NBT_len = readVarInt();
+        if(NBT_len != 0){
+            dumpBytes(NBT_len);
+        }
+    }
+    return ret;
+}
+
+int32_t minecraft::readInt(){
+    char b[4] = {};
+    S->readBytes(b, 4);
+    uint32_t l = ((uint32_t) b[0] << 24)
+       | ((uint32_t) b[1] & 0xff) << 16
+       | ((uint32_t) b[2] & 0xff) << 8
+       | ((uint32_t) b[3] & 0xff);
+    return l;
+}
+
+uint32_t minecraft::readUnsignedInt(){
+    char b[4] = {};
+    S->readBytes(b, 4);
+    uint32_t l = ((uint32_t) b[0] << 24)
+       | ((uint32_t) b[1] & 0xff) << 16
+       | ((uint32_t) b[2] & 0xff) << 8
+       | ((uint32_t) b[3] & 0xff);
+    return l;
 }
 
 // WRITE TYPES
@@ -368,6 +622,15 @@ void packet::writeUUID(int user_id){
     write(user_id);
 }
 
+void packet::writeSlot(slot item){
+    writeByte(item.present);
+    if(item.present){
+        writeVarInt(item.id);
+        writeByte(item.count);
+        writeByte(0); // no NBT data
+    }
+}
+
 void minecraft::writeLength(uint32_t length){
     do {
         uint8_t temp = (uint8_t)(length & 0b01111111);
@@ -380,61 +643,70 @@ void minecraft::writeLength(uint32_t length){
 }
 
 
-void minecraft::handle(){
+void minecraft::readCompressed(){
     int pack_length = readVarInt();
-    if(compression_enabled){
-        int data_length = readVarInt();
-        //login("cpr");
+    int data_length = readVarInt();
+    //login("cpr");
+    if(data_length != 0){
+        int len = pack_length - VarIntLength(data_length);
+        S->readBytes(buf, len);
         //login("compr len: " + String(pack_length) + "B data len: " + String(data_length));
-        if(data_length != 0){
-            int len = pack_length - VarIntLength(data_length);
-            S->readBytes(buf, len);
-        } else {
-            int id = readVarInt();
-            //login("id " + String(id, HEX));
-            switch (id){
-                case 0x04:
-                    readSpawnPlayer();
-                    break;
-                case 0x49:
-                    readFoodAndSat();
-                    break;
-                case 0x34:
-                    readPlayerPosAndLook();
-                    break;
-                case 0x08:
-                    readBlockDestroy();
-                    break;
-                case 0x1F:
-                    readKeepAlive();
-                    break;
-                case 0x0E:
-                    readChat();
-                    break;
-                default:
-                    int len = pack_length - VarIntLength(id) - VarIntLength(data_length);
-                    S->readBytes(buf, len);
-                    break;
-            }
-        } 
     } else {
         int id = readVarInt();
-        login("pack len: " + String(pack_length) + "B id: 0x" + String(id, HEX));
-
         switch (id){
-            case 0x03:
-                readSetCompressionThres();
-                break;
-            case 0x00:
-                readDisconnected();
-                break;
-            default:{
-                for(int i=0; i<pack_length - 1; i++ ){
-                    S->read();
+            case 0x04: readSpawnPlayer(); break;
+            case 0x49: readFoodAndSat(); break;
+            case 0x34: readPlayerPosAndLook(); break;
+            case 0x08: readBlockDestroy(); break;
+            case 0x1F: readKeepAlive(); break;
+            case 0x0E: readChat(); break;
+            case 0x0D: readServerDifficulty(); break;
+            case 0x3F: readHeldItem(); break;
+            case 0x48: readExperience(); break;
+            case 0x42: readSpawnPoint(); break;
+            case 0x13: readWindowItems(); break;
+            case 0x15: readSetSlot(); break;
+            case 0x02: readSpawnEntity(); break;
+            case 0x36: readDestroyEntity(); break;
+            case 0x26: readTradeList(); break;
+            case 0x11: readWindowConfirmation(); break;
+            case 0x19: readDisconnected(); break;
+            default:
+                for(auto b : blacklisted_packets){
+                    if(id == b){
+                        goto out;
+                    }
                 }
+                login("id " + String(id, HEX));
+                out:
+                int len = pack_length - VarIntLength(id) - VarIntLength(data_length);
+                S->readBytes(buf, len);
                 break;
-            }
         }
+    }
+}
+
+void minecraft::readUncompressed(){
+    int pack_length = readVarInt();
+    int id = readVarInt();
+    switch (id){
+        case 0x03: readSetCompressionThres(); break;
+        case 0x00: readDisconnected(); break;
+        default:{
+            login("uncompressed pack len: " + String(pack_length) + "B id: 0x" + String(id, HEX));
+            for(int i=0; i<pack_length - 1; i++ ){
+                S->read();
+            }
+            break;
+        }
+    }
+}
+
+void minecraft::handle(){
+    if(compression_enabled){
+        readCompressed();
+    } else {
+        readUncompressed();
     }
 }
 

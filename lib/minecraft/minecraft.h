@@ -3,6 +3,21 @@
 
 #include <Arduino.h>
 #include <mutex>
+#include <map>
+//#include "rom/miniz.h"
+
+struct entity{
+    float x;
+    float y;
+    float z;
+    int32_t type;
+};
+
+struct slot{
+    bool present;
+    uint32_t id;
+    uint8_t count;
+};
 
 class packet{
     public:
@@ -37,6 +52,7 @@ class packet{
     void writeByte          (int8_t num);
     void writeBoolean       (uint8_t val);
     void writeUUID          (int user_id);
+    void writeSlot          (slot item);
 
     // write to server
     void serverWriteVarInt  (int32_t value);
@@ -51,9 +67,13 @@ class minecraft{
     uint32_t server_port;
     std::mutex * mtx;
     Stream* S;
+    std::map<uint32_t, entity> entity_map;
+
+    uint8_t game_state = 0; // 0: login 1: play
     int id;
     bool compression_enabled = 0;
     int compression_treshold = 0;
+    slot inventory[36];
     bool writing = 0;
     double x = 0;
     double y = 0;
@@ -67,10 +87,20 @@ class minecraft{
     int food = 0;
     float food_sat = 0;
     uint8_t buf[50000];
-    
+    uint8_t held_item = 0;
+    uint32_t experience = 0;
+    uint8_t windowid = 0;
+
+    // these won't show in logs
+    uint8_t blacklisted_packets[29] = {0x55, 0x17, 0x30, 0x1A, 0x35, 0x32, 0x40, 0x3A, 0x27, 0x44,
+                                       0x46, 0x28, 0x56, 0x58, 0x4E, 0x36, 0x47, 0x00, 0x29, 0x0b,
+                                       0x21, 0x4B, 0x3D, 0x51, 0x3B, 0x22, 0x05, 0x1c, 0x0A};
+
     int timeout = 100;
 
     void handle();
+    void readUncompressed();
+    void readCompressed();
 
     // clientbound
     void readSpawnPlayer         ();
@@ -81,7 +111,18 @@ class minecraft{
     void readChat                ();
     void readSetCompressionThres ();
     void readDisconnected        ();
+    void readServerDifficulty    ();
+    void readHeldItem            ();
+    void readExperience          ();
+    void readSpawnPoint          ();
+    void readWindowItems         ();
+    void readSetSlot             ();
+    void readSpawnEntity         ();
+    void readDestroyEntity       ();
+    void readTradeList           ();
+    void readWindowConfirmation  ();
 
+    // serverbound
     void writeHandle             ();  // this stream is the logging port not the web socket!!
     void writeTeleportConfirm    (int id);
     void writeSetRotation        (float yaw, float pitch, bool ground);
@@ -92,6 +133,12 @@ class minecraft{
     void writeChat               (String text);
     void writeHandShake          (uint8_t state);
     void writeClientStatus       (uint8_t state);
+    void writeInteract           (uint32_t entityid, uint8_t hand, bool sneaking);
+    void writeInteractAt         (uint32_t entityid, uint8_t hand, bool sneaking, uint32_t x, uint32_t y, uint32_t z);
+    void writeAttack             (uint32_t entityid, uint8_t hand, bool sneaking);
+    void writeClickWindow        (uint8_t window_id, int16_t slot_id, uint8_t button, int16_t action_id, uint8_t mode, slot item);
+    void writeWindowConfirmation (uint8_t window_id, int16_t action_num, bool accepted);
+    void writeCloseWindow        ();
 
     void loginfo            (String msg);
     void logerr             (String msg);
@@ -103,11 +150,17 @@ class minecraft{
     int32_t readVarInt      ();
     String readString       ();
     int64_t readLong        ();
+    uint64_t readUnsignedLong();
+    int16_t readShort       ();
     uint16_t readUnsignedShort();
+    int32_t readInt         ();
+    uint32_t readUnsignedInt();
     uint32_t VarIntLength   (int32_t val);
     uint8_t readByte        ();
     bool readBool           ();
     uint64_t readUUID       ();
+    void dumpBytes          (uint32_t len);
+    slot readSlot           ();
 
     void writeLength        (uint32_t length);
 };

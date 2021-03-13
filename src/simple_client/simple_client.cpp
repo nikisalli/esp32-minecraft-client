@@ -2,7 +2,6 @@
 #include <WiFi.h>
 #include <minecraft.h>
 #include <config.h>
-//#include "../src/miniz.h"
 
 TaskHandle_t listener;
 WiFiClient client;
@@ -47,16 +46,12 @@ void setup() {
 
     mc.writeChat("test");
     Serial.println("[INFO] -> writing to chat");
+    vTaskDelay(pdMS_TO_TICKS(2000));
 }
 
 void loop(){
-    mc.yaw+=10;
-    if(mc.yaw > 360){
-        mc.yaw = 0;
+    if(mc.health < 0.01){
+        mc.writeClientStatus(0);
     }
-    mc.writeSetRotation(mc.yaw, mc.pitch, mc.onGround);
-    vTaskDelay(pdMS_TO_TICKS(50));
-
-    //Serial.println("[INFO] # buf: " + String(client.available()/1024.0) + "kB Heap: " + String(ESP.getFreeHeap()/1024.0) + "kB");
-    //mc.writeChat(client, "[nik INFO] Heap: " + String(ESP.getFreeHeap()/1024.0) + "kB || buf: " + String(client.available()/1024.0) + "kB");
+    vTaskDelay(pdMS_TO_TICKS(1000));
 }
