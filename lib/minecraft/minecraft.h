@@ -21,7 +21,7 @@ struct slot{
 
 class packet{
     public:
-    uint8_t buffer[6000];
+    uint8_t buffer[256];
     uint32_t index = 0;
     bool compression_enabled;
     Stream* S;
@@ -73,7 +73,6 @@ class minecraft{
     int id;
     bool compression_enabled = 0;
     int compression_treshold = 0;
-    slot inventory[36];
     bool writing = 0;
     double x = 0;
     double y = 0;
@@ -121,6 +120,8 @@ class minecraft{
     void readDestroyEntity       ();
     void readTradeList           ();
     void readWindowConfirmation  ();
+    void readSpawnObject         ();
+    void readOpenWindow          ();
 
     // serverbound
     void writeHandle             ();  // this stream is the logging port not the web socket!!
@@ -139,6 +140,8 @@ class minecraft{
     void writeClickWindow        (uint8_t window_id, int16_t slot_id, uint8_t button, int16_t action_id, uint8_t mode, slot item);
     void writeWindowConfirmation (uint8_t window_id, int16_t action_num, bool accepted);
     void writeCloseWindow        ();
+    void writeUseItem            (uint8_t hand);
+    void writePlayerBlockPlace   (uint8_t hand, int64_t bx, int64_t by, int64_t bz, uint32_t face, float cx, float cy, float cz, bool inside);
 
     void loginfo            (String msg);
     void logerr             (String msg);
@@ -161,6 +164,10 @@ class minecraft{
     uint64_t readUUID       ();
     void dumpBytes          (uint32_t len);
     slot readSlot           ();
+    void readNBT            ();
+    String readNBTString    ();
+    void readNBTList        ();
+    void readNBTCompound    ();
 
     void writeLength        (uint32_t length);
 };
