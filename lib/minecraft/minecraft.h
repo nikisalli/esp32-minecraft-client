@@ -92,6 +92,7 @@ class minecraft{
     uint32_t packet_count = 0;
     bool chat_enabled = true;
     uint32_t last_keepalive = 0;
+    uint32_t action_id = 0;
 
     // these won't show in logs
     uint8_t blacklisted_packets[29] = {0x55, 0x17, 0x30, 0x1A, 0x35, 0x32, 0x40, 0x3A, 0x27, 0x44,
@@ -140,12 +141,14 @@ class minecraft{
     void writeInteract           (uint32_t entityid, uint8_t hand, bool sneaking);
     void writeInteractAt         (uint32_t entityid, uint8_t hand, bool sneaking, uint32_t x, uint32_t y, uint32_t z);
     void writeAttack             (uint32_t entityid, uint8_t hand, bool sneaking);
-    void writeClickWindow        (uint8_t window_id, int16_t slot_id, uint8_t button, int16_t action_id, uint8_t mode, slot item);
+    void writeClickWindow        (uint8_t window_id, int16_t slot_id, uint8_t button, uint8_t mode, slot item);
     void writeWindowConfirmation (uint8_t window_id, int16_t action_num, bool accepted);
     void writeCloseWindow        ();
     void writeUseItem            (uint8_t hand);
     void writePlayerBlockPlace   (uint8_t hand, int64_t bx, int64_t by, int64_t bz, uint32_t face, float cx, float cy, float cz, bool inside);
     void writeClientSettings     (uint8_t view_distance, uint8_t chat_mode, bool chat_colors, uint8_t skin_parts, uint8_t main_hand);
+    void writeRequestRecipe      (uint8_t window_id, String recipe, bool all);
+    void writeSelectTrade        (uint32_t slotid);
 
     void loginfo            (String msg);
     void logerr             (String msg);

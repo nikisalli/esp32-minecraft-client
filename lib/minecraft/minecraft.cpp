@@ -165,7 +165,7 @@ void minecraft::readWindowItems(){
 }
 
 void minecraft::readSetSlot(){
-    windowid = readByte();
+    readByte();
     uint32_t elementnum = readShort();
     slot temp = readSlot();
     if(temp.present){
@@ -387,7 +387,7 @@ void minecraft::writeAttack(uint32_t entityid, uint8_t hand, bool sneaking){
     logout("attack sent");
 }
 
-void minecraft::writeClickWindow(uint8_t window_id, int16_t slot_id, uint8_t button, int16_t action_id, uint8_t mode, slot item){
+void minecraft::writeClickWindow(uint8_t window_id, int16_t slot_id, uint8_t button, uint8_t mode, slot item){
     packet p(S, mtx, compression_enabled);
     p.writeVarInt(0x09);
     p.writeByte(window_id);
@@ -397,7 +397,8 @@ void minecraft::writeClickWindow(uint8_t window_id, int16_t slot_id, uint8_t but
     p.writeVarInt(mode);
     p.writeSlot(item);
     p.writePacket();
-    logout("clicked window slot id " + String(slot_id));
+    action_id++;
+    logout("clicked windowID: " + String(windowid) + " slot id " + String(slot_id));
 }
 
 void minecraft::writeWindowConfirmation(uint8_t window_id, int16_t action_num, bool accepted){
@@ -411,11 +412,14 @@ void minecraft::writeWindowConfirmation(uint8_t window_id, int16_t action_num, b
 }
 
 void minecraft::writeCloseWindow(){
-    packet p(S, mtx, compression_enabled);
-    p.writeVarInt(0x0A);
-    p.writeByte(windowid);
-    p.writePacket();
-    logout("windowID: " + String(windowid) + " closed");
+    if(windowid != 0){
+        packet p(S, mtx, compression_enabled);
+        p.writeVarInt(0x0A);
+        p.writeByte(windowid);
+        p.writePacket();
+        logout("windowID: " + String(windowid) + " closed");
+        windowid = 0;
+    }
 }
 
 void minecraft::writeUseItem(uint8_t hand){
@@ -457,6 +461,24 @@ void minecraft::writeClientSettings(uint8_t view_distance, uint8_t chat_mode, bo
     p.writeVarInt(main_hand);
     p.writePacket();
     logout("client settings packet");
+}
+
+void minecraft::writeRequestRecipe(uint8_t window_id, String recipe, bool all){
+    packet p(S, mtx, compression_enabled);
+    p.writeVarInt(0x19);
+    p.writeByte(window_id);
+    p.writeString(recipe);
+    p.writeByte(all);
+    p.writePacket();
+    logout("recipe sent: " + recipe);
+}
+
+void minecraft::writeSelectTrade(uint32_t slotid){
+    packet p(S, mtx, compression_enabled);
+    p.writeVarInt(0x23);
+    p.writeVarInt(slotid);
+    p.writePacket();
+    logout("selected trade: " + String(slotid));
 }
 
 // READ TYPES
