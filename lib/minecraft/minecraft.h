@@ -91,6 +91,7 @@ class minecraft{
     uint8_t windowid = 0;
     uint32_t packet_count = 0;
     bool chat_enabled = true;
+    uint32_t last_keepalive = 0;
 
     // these won't show in logs
     uint8_t blacklisted_packets[29] = {0x55, 0x17, 0x30, 0x1A, 0x35, 0x32, 0x40, 0x3A, 0x27, 0x44,

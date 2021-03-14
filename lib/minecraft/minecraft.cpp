@@ -96,6 +96,7 @@ void minecraft::readBlockDestroy(){
 void minecraft::readKeepAlive(){
     uint64_t num = readLong();
     writeKeepAlive(num);
+    last_keepalive = millis();
     login("received keepalive");
 }
 
