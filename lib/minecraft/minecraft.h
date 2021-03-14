@@ -89,6 +89,8 @@ class minecraft{
     uint8_t held_item = 0;
     uint32_t experience = 0;
     uint8_t windowid = 0;
+    uint32_t packet_count = 0;
+    bool chat_enabled = true;
 
     // these won't show in logs
     uint8_t blacklisted_packets[29] = {0x55, 0x17, 0x30, 0x1A, 0x35, 0x32, 0x40, 0x3A, 0x27, 0x44,
@@ -142,6 +144,7 @@ class minecraft{
     void writeCloseWindow        ();
     void writeUseItem            (uint8_t hand);
     void writePlayerBlockPlace   (uint8_t hand, int64_t bx, int64_t by, int64_t bz, uint32_t face, float cx, float cy, float cz, bool inside);
+    void writeClientSettings     (uint8_t view_distance, uint8_t chat_mode, bool chat_colors, uint8_t skin_parts, uint8_t main_hand);
 
     void loginfo            (String msg);
     void logerr             (String msg);

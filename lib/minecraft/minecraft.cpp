@@ -103,7 +103,10 @@ void minecraft::readChat(){
     String chat = readString();
     uint8_t pos = readByte();
     uint64_t player_UUID = readUUID();
-    login("received message: " + chat + " sender type: " + String(pos));
+    if(chat_enabled){
+        login("received message: " + chat + " sender type: " + String(pos));
+    }
+    
 }
 
 void minecraft::readSetCompressionThres(){
@@ -442,6 +445,19 @@ void minecraft::writePlayerBlockPlace(uint8_t hand, int64_t bx, int64_t by, int6
     logout("block placed");
 }
 
+void minecraft::writeClientSettings(uint8_t view_distance, uint8_t chat_mode, bool chat_colors, uint8_t skin_parts, uint8_t main_hand){
+    packet p(S, mtx, compression_enabled);
+    p.writeVarInt(0x05);
+    p.writeString("en_GB");
+    p.writeByte(view_distance);
+    p.writeVarInt(chat_mode);
+    p.writeByte(chat_colors);
+    p.writeByte(skin_parts);
+    p.writeVarInt(main_hand);
+    p.writePacket();
+    logout("client settings packet");
+}
+
 // READ TYPES
 uint16_t minecraft::readUnsignedShort(){
     while(S->available() < 2);
@@ -574,46 +590,41 @@ String minecraft::readNBTString(){
 }
 
 void minecraft::readNBTCompound(){
+    Serial.println("COMPOUND");
     uint8_t level = 1;
     while(level > 0){
         uint8_t type = readByte();
         switch(type){
             case 0x00: // END nameless
-                // Serial.print("END");
+                Serial.print("END");
                 level--;
                 break;
             case 0x01: // BYTE
-                // Serial.print("BYTE: " + readNBTString());
-                readNBTString();
+                Serial.print("BYTE: " + readNBTString());
                 readByte();
                 break;
             case 0x02: // SHORT
-                // Serial.print("SHORT: " + readNBTString());
-                readNBTString();
+                Serial.print("SHORT: " + readNBTString());
                 readShort();
                 break;
             case 0x03: // INT
-                // Serial.print("INT: " + readNBTString());
-                readNBTString();
+                Serial.print("INT: " + readNBTString());
                 readInt();
                 break;
             case 0x04: // LONG
-                // Serial.print("LONG: " + readNBTString());
-                readNBTString();
+                Serial.print("LONG: " + readNBTString());
                 readLong();
                 break;
             case 0x05: // FLOAT
-                // Serial.print("FLOAT: " + readNBTString());
-                readNBTString();
+                Serial.print("FLOAT: " + readNBTString());
                 readFloat();
                 break;
             case 0x06: // DOUBLE
-                // Serial.print("DOUBLE: " + readNBTString());
-                readNBTString();
+                Serial.print("DOUBLE: " + readNBTString());
                 readDouble();
                 break;
             case 0x07:{// BYTE ARRAY
-                    // Serial.print("BYTE ARRAY: " + readNBTString());
+                    Serial.print("BYTE ARRAY: " + readNBTString());
                     readNBTString();
                     uint32_t num = readInt(); // array length
                     while(num){
@@ -623,8 +634,7 @@ void minecraft::readNBTCompound(){
                     break;
                 }
             case 0x08: // STRING
-                // Serial.print("STRING: " + readNBTString());
-                readNBTString();
+                Serial.print("STRING: " + readNBTString());
                 readNBTString();
                 break;
             case 0x09:{ // LIST
@@ -636,8 +646,7 @@ void minecraft::readNBTCompound(){
                 level++;
                 break;
             case 0x0B:{ // INT ARRAY
-                    // Serial.print("INT ARRAY: " + readNBTString());
-                    readNBTString();
+                    Serial.print("INT ARRAY: " + readNBTString());
                     uint32_t num = readInt(); // array length
                     while(num){
                         readInt();
@@ -646,8 +655,7 @@ void minecraft::readNBTCompound(){
                     break;
                 }
             case 0x0C:{ // LONG ARRAY
-                    // Serial.print("LONG ARRAY: " + readNBTString());
-                    readNBTString();
+                    Serial.print("LONG ARRAY: " + readNBTString());
                     uint32_t num = readInt(); // array length
                     while(num){
                         readLong();
@@ -656,18 +664,18 @@ void minecraft::readNBTCompound(){
                     break;
                 }
             default:
-                // Serial.print("UNSUPPORTED " + String(type, HEX));
+                Serial.print("UNSUPPORTED " + String(type, HEX));
                 break;
         }
-        // Serial.println();
+        Serial.println();
     }
 }
 
 void minecraft::readNBTList(){
-    //Serial.print("LIST: " + readNBTString());
+    Serial.print("LIST: " + readNBTString());
     uint8_t ltype = readByte();
     uint8_t num = readInt();
-    //Serial.println(" type: " + String(ltype, HEX) + " len: " + String(num));
+    Serial.println(" type: " + String(ltype, HEX) + " len: " + String(num));
     while(num){
         switch(ltype){
             case 0x01: /*Serial.print("BYTE");*/ readByte();break;
@@ -895,6 +903,7 @@ void minecraft::readUncompressed(){
 }
 
 void minecraft::handle(){
+    packet_count++;
     if(compression_enabled){
         readCompressed();
     } else {
