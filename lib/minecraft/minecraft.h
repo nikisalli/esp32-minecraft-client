@@ -21,7 +21,7 @@ struct slot{
 
 class packet{
     public:
-    uint8_t buffer[6000];
+    uint8_t buffer[256];
     uint32_t index = 0;
     bool compression_enabled;
     Stream* S;
@@ -73,7 +73,6 @@ class minecraft{
     int id;
     bool compression_enabled = 0;
     int compression_treshold = 0;
-    slot inventory[36];
     bool writing = 0;
     double x = 0;
     double y = 0;
@@ -90,6 +89,10 @@ class minecraft{
     uint8_t held_item = 0;
     uint32_t experience = 0;
     uint8_t windowid = 0;
+    uint32_t packet_count = 0;
+    bool chat_enabled = true;
+    uint32_t last_keepalive = 0;
+    uint32_t action_id = 0;
 
     // these won't show in logs
     uint8_t blacklisted_packets[29] = {0x55, 0x17, 0x30, 0x1A, 0x35, 0x32, 0x40, 0x3A, 0x27, 0x44,
@@ -121,6 +124,8 @@ class minecraft{
     void readDestroyEntity       ();
     void readTradeList           ();
     void readWindowConfirmation  ();
+    void readSpawnObject         ();
+    void readOpenWindow          ();
 
     // serverbound
     void writeHandle             ();  // this stream is the logging port not the web socket!!
@@ -136,9 +141,14 @@ class minecraft{
     void writeInteract           (uint32_t entityid, uint8_t hand, bool sneaking);
     void writeInteractAt         (uint32_t entityid, uint8_t hand, bool sneaking, uint32_t x, uint32_t y, uint32_t z);
     void writeAttack             (uint32_t entityid, uint8_t hand, bool sneaking);
-    void writeClickWindow        (uint8_t window_id, int16_t slot_id, uint8_t button, int16_t action_id, uint8_t mode, slot item);
+    void writeClickWindow        (uint8_t window_id, int16_t slot_id, uint8_t button, uint8_t mode, slot item);
     void writeWindowConfirmation (uint8_t window_id, int16_t action_num, bool accepted);
     void writeCloseWindow        ();
+    void writeUseItem            (uint8_t hand);
+    void writePlayerBlockPlace   (uint8_t hand, int64_t bx, int64_t by, int64_t bz, uint32_t face, float cx, float cy, float cz, bool inside);
+    void writeClientSettings     (uint8_t view_distance, uint8_t chat_mode, bool chat_colors, uint8_t skin_parts, uint8_t main_hand);
+    void writeRequestRecipe      (uint8_t window_id, String recipe, bool all);
+    void writeSelectTrade        (uint32_t slotid);
 
     void loginfo            (String msg);
     void logerr             (String msg);
@@ -161,6 +171,10 @@ class minecraft{
     uint64_t readUUID       ();
     void dumpBytes          (uint32_t len);
     slot readSlot           ();
+    void readNBT            ();
+    String readNBTString    ();
+    void readNBTList        ();
+    void readNBTCompound    ();
 
     void writeLength        (uint32_t length);
 };

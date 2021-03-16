@@ -1,12 +1,15 @@
 # esp32-minecraft-client
-an esp32 based minecraft client
+this is an esp32 based minecraft client!
 
 # INFO
-this only works on minecraft 1.15.2 for now (protocol version 578) and it's really unstable.
-the default sketch attempts to connect and then just keeps spinning its head.
+- the currently supported version is 1.16.5 (protocol version 754)
+- it may sometimes crash due to the esp32 being quite slow when parsing packets
+- this only works for online-mode-off servers
+- chunks are completely ignored since parsing chunks implies decompressing quite big frames of data and esp32 is already struggling by just receiving them
 
 # HOW TO USE
-rename include/credentials_edit_me.h to credentials.h and edit it with your data, compile and upload.
-It should write some debug info on the serial port and access the server.
+rename include/config_edit_me.h to config.h and edit it with your own data, compile, upload using platformio and enjoy!
+It should start writing debug info on the serial port and join the server
 
-![alt text](https://github.com/nikisalli/esp32-minecraft-client/blob/features/images/example1.jpg?raw=true)
+# SAMPLES
+![alt text](https://github.com/nikisalli/esp32-minecraft-client/raw/master/images/example1.jpg)
